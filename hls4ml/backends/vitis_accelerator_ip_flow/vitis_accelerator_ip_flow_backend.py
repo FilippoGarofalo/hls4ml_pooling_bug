@@ -1,13 +1,13 @@
 import os
 
-from hls4ml.backends import VitisBackend, VivadoBackend
+from hls4ml.backends import VitisBackend
 from hls4ml.model.flow import register_flow
 from hls4ml.report import parse_vivado_report
 
 
 class VitisAcceleratorIPFlowBackend(VitisBackend):
     def __init__(self):
-        super(VivadoBackend, self).__init__(name='VitisAcceleratorIPFlow')
+        super(VitisBackend, self).__init__(name='VitisAcceleratorIPFlow')
         self._register_layer_attributes()
         self._register_flows()
 
