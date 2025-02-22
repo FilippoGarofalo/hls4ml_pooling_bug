@@ -107,7 +107,7 @@ class VitisAcceleratorIPFlowBackend(VitisBackend):
         # vivado_ip = 'vivado:ip'
         writer_passes = ['make_stamp', 'vitisacceleratoripflow:write_hls']
         self._writer_flow = register_flow('write', writer_passes, requires=['vitis:ip'], backend=self.name)
-        # self._default_flow = vivado_ip
+        self._default_flow = 'vitis:ip'
 
         # Register the fifo depth optimization flow which is different from the one for vivado
         fifo_depth_opt_passes = [
