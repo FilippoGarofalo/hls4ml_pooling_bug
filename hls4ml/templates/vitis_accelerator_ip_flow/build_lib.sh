@@ -13,6 +13,8 @@ INCFLAGS="-Ifirmware/ap_types/"
 
 PROJECT=myproject
 LIB_STAMP=mystamp
+BASEDIR="$(cd "$(dirname "$0")" && pwd)"
+WEIGHTS_DIR="\"${BASEDIR}/firmware/weights\""
 
 ${CC} ${CFLAGS} ${INCFLAGS} -D WEIGHTS_DIR="${WEIGHTS_DIR}" -c firmware/${PROJECT}.cpp -o ${PROJECT}.o
 ${CC} ${CFLAGS} ${INCFLAGS} -D WEIGHTS_DIR="${WEIGHTS_DIR}" -c firmware/${PROJECT}_axi.cpp -o ${PROJECT}_axi.o
