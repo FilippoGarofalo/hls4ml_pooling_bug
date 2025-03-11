@@ -45,7 +45,7 @@ def initialize_large_fifos(model, profiling_fifo_depth):
     outp.pragma = (outp.pragma[0], profiling_fifo_depth)
     return initial_fifo_depths
 
-
+  
 def execute_cosim_to_profile_fifos(model):
     """Execute a cosimulation with a testh bench that calls the top function - Vitis IP at **least twice**,
     to properly profile the max FIFO depths. The function will momentarily replace the initial test bench
