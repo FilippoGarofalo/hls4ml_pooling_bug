@@ -60,6 +60,7 @@ class VitisAcceleratorIPFlowBackend(VitisBackend):
         driver='python',
         input_type='float',
         output_type='float',
+        tb_output_stream='both',
     ):
         '''
         Create initial accelerator config with default parameters
@@ -79,12 +80,16 @@ class VitisAcceleratorIPFlowBackend(VitisBackend):
             output_type: the wrapper output precision. Can be `float` or an `ap_type`. Note:
                               VivadoAcceleratorBackend will round the number of bits used to the next power-of-2 value.
             platform: development target platform
+            tb_output_stream (str, optional): Controls where to write the output. Options are 'stdout', 'file' and 'both'.
+                Defaults to 'both'.
 
         Returns:
             populated config
         '''
         board = board if board is not None else 'pynq-z2'
-        config = super().create_initial_config(part, clock_period, clock_uncertainty, io_type)
+        config = super().create_initial_config(
+            part, clock_period, clock_uncertainty, io_type, tb_output_stream=tb_output_stream
+        )
         config['AcceleratorConfig'] = {}
         config['AcceleratorConfig']['Board'] = board
         config['AcceleratorConfig']['Interface'] = interface  # axi_stream, axi_master, axi_lite
