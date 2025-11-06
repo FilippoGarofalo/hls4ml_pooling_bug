@@ -1,3 +1,4 @@
+from hls4ml.writer.bambu_writer import BambuWriter
 from hls4ml.writer.catapult_writer import CatapultWriter
 from hls4ml.writer.oneapi_writer import OneAPIWriter
 from hls4ml.writer.quartus_writer import QuartusWriter
@@ -14,3 +15,4 @@ register_writer('Quartus', QuartusWriter)
 register_writer('oneAPI', OneAPIWriter)
 register_writer('Catapult', CatapultWriter)
 register_writer('SymbolicExpression', SymbolicExpressionWriter)
+register_writer('Bambu', BambuWriter)
