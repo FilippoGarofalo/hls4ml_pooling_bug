@@ -6,21 +6,21 @@
 namespace nnet {
 
 template <class res_T, typename CONFIG_T> void fill_zero(hls::stream<res_T> &res) {
-    #pragma HLS INLINE
+    //#pragma HLS INLINE
     res_T res_part;
     for (int c = 0; c < CONFIG_T::n_chan; c++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         res_part[c] = 0;
     }
     res.write(res_part);
 }
 
 template <class data_T, class res_T, typename CONFIG_T> void fill_data(hls::stream<data_T> &data, hls::stream<res_T> &res) {
-    #pragma HLS INLINE
+    //#pragma HLS INLINE
     data_T data_part = data.read();
     res_T res_part;
     for (int c = 0; c < CONFIG_T::n_chan; c++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         res_part[c] = data_part[c];
     }
     res.write(res_part);

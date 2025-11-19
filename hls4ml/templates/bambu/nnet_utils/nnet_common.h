@@ -12,7 +12,7 @@
 #define STRINGIFY(x) #x
 #define EXPAND_STRING(x) STRINGIFY(x)
 
-#ifndef __VITIS_HLS__
+#ifndef __BAMBU__
 #define DATA_PACK_TXT HLS DATA_PACK variable =
 #define DATA_PACK_PRAGMA(variable) DATA_PACK_TXT variable
 #define PRAGMA_DATA_PACK(variable) _Pragma(EXPAND_STRING(DATA_PACK_PRAGMA(variable)))
@@ -24,7 +24,7 @@ namespace nnet {
 
 // Common type definitions
 enum io_type { io_parallel = 0, io_stream };
-enum strategy { latency, resource, resource_unrolled, distributed_arithmetic };
+enum strategy { latency, resource, resource_unrolled };
 
 /* ---
  * Balanced tree reduce implementation.

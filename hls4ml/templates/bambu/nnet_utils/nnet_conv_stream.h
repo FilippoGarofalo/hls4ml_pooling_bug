@@ -14,7 +14,7 @@ enum class conv_implementation { linebuffer = 0, encoded = 1 };
 //       Encoded Implementation (Vlad's)
 // *************************************************
 template <unsigned K, unsigned S, unsigned W> unsigned scale_index_K_gte_S(const unsigned idx) {
-    #pragma HLS INLINE
+    //#pragma HLS INLINE
 
     if (idx < K - S) {
         return idx;
@@ -35,7 +35,7 @@ template <unsigned K, unsigned S, unsigned W> unsigned scale_index_K_gte_S(const
 }
 
 template <unsigned K, unsigned S, unsigned W> unsigned scale_index_K_lt_S(const unsigned idx) {
-    #pragma HLS INLINE
+    //#pragma HLS INLINE
 
     if (idx < S - K) {
         return idx;
@@ -58,7 +58,7 @@ template <unsigned K, unsigned S, unsigned W> unsigned scale_index_K_lt_S(const 
 template <unsigned K, unsigned S, unsigned W> class scale_index_regular {
   public:
     static unsigned scale_index(const unsigned idx) {
-        #pragma HLS INLINE
+        //#pragma HLS INLINE
 
         if (K >= S) {
             return scale_index_K_gte_S<K, S, W>(idx);
@@ -71,7 +71,7 @@ template <unsigned K, unsigned S, unsigned W> class scale_index_regular {
 template <unsigned K, unsigned S, unsigned W> class scale_index_unscaled {
   public:
     static unsigned scale_index(const unsigned idx) {
-        #pragma HLS INLINE
+        //#pragma HLS INLINE
         return idx;
     }
 };
@@ -81,26 +81,26 @@ void mult_buffer(hls::stream<typename data_T::value_type> data_window[CONFIG_T::
                  res_T &res_pack, hls::stream<res_T> &res_stream, unsigned &outputs_ready,
                  typename CONFIG_T::weight_t weights[CONFIG_T::kernel_size * CONFIG_T::n_chan * CONFIG_T::n_filt],
                  typename CONFIG_T::bias_t biases[CONFIG_T::n_filt]) {
-    #pragma HLS INLINE
+    //#pragma HLS INLINE
 
     typename data_T::value_type data[CONFIG_T::kernel_size * CONFIG_T::n_chan];
-    #pragma HLS ARRAY_PARTITION variable = data complete
+    //#pragma HLS ARRAY_PARTITION variable = data complete
     typename res_T::value_type res[CONFIG_T::n_filt];
-    #pragma HLS ARRAY_PARTITION variable = res complete
+    //#pragma HLS ARRAY_PARTITION variable = res complete
 
 InitData:
     for (int id = 0; id < CONFIG_T::kernel_size * CONFIG_T::n_chan; id++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         data[id] = data_window[id].read();
     }
 
-    #pragma HLS INLINE recursive
+    //#pragma HLS INLINE recursive
     CONFIG_T::mult_config::template kernel<typename data_T::value_type, typename res_T::value_type,
                                            typename CONFIG_T::mult_config>::dense(data, res, weights, biases);
 
 CastLoop:
     for (unsigned jj = 0; jj < CONFIG_T::n_filt; jj++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         if (res_T::size / CONFIG_T::n_filt == 1) {
             res_pack[jj] = res[jj];
         } else {
@@ -126,17 +126,17 @@ void compute_output_encoded(const data_T &in_elem,
                             hls::stream<res_T> &res, res_T &res_pack, unsigned &outputs_ready,
                             typename CONFIG_T::weight_t weights[CONFIG_T::kernel_size * CONFIG_T::n_chan * CONFIG_T::n_filt],
                             typename CONFIG_T::bias_t biases[CONFIG_T::n_filt], ap_uint<CONFIG_T::kernel_size> *pixel_idx) {
-    #pragma HLS INLINE
+    //#pragma HLS INLINE
 
 MultLoop:
     for (unsigned p = 0; p < data_T::size / CONFIG_T::n_chan; p++) {
-        #pragma HLS PIPELINE II = CONFIG_T::reuse_factor
+        //#pragma HLS PIPELINE II = CONFIG_T::reuse_factor
     CopyDataFilt:
         for (unsigned f = 0; f < CONFIG_T::kernel_size; f++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
         CopyDataChan:
             for (unsigned c = 0; c < CONFIG_T::n_chan; c++) {
-                #pragma HLS UNROLL
+                //#pragma HLS UNROLL
                 if (pixel_idx[p][f])
                     data_window[f * CONFIG_T::n_chan + c].write(in_elem[p * CONFIG_T::n_chan + c]);
             }
@@ -153,16 +153,16 @@ MultLoop:
 template <class data_T, typename CONFIG_T>
 void kernel_shift_1d(const data_T &in_elem,
                      typename data_T::value_type kernel_window[CONFIG_T::filt_width * CONFIG_T::n_chan]) {
-    #pragma HLS inline
+    //#pragma HLS inline
 
     // Shift kernel_window by one step to the left (manual shift operation)
     static const int filt_width = CONFIG_T::filt_width - 1;
 KernelShiftWidth:
     for (int i_iw = 0; i_iw < filt_width; i_iw++) {
-        #pragma HLS PIPELINE II = 1
+        //#pragma HLS PIPELINE II = 1
     KernelShiftChannel:
         for (unsigned i_ic = 0; i_ic < CONFIG_T::n_chan; i_ic++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             // Shift every element in kernel_window to the left
             kernel_window[i_iw * CONFIG_T::n_chan + i_ic] = kernel_window[(i_iw + 1) * CONFIG_T::n_chan + i_ic];
         }
@@ -172,7 +172,7 @@ KernelShiftWidth:
     static const int lastheight = (CONFIG_T::filt_width - 1) * CONFIG_T::n_chan;
 KernelPushChannel:
     for (int i_ic = 0; i_ic < CONFIG_T::n_chan; i_ic++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         kernel_window[lastheight + i_ic] = in_elem[i_ic];
     }
 }
@@ -181,13 +181,13 @@ template <class data_T, typename CONFIG_T>
 void kernel_shift_2d(
     typename data_T::value_type shift_buffer[CONFIG_T::filt_height][CONFIG_T::n_chan],
     typename data_T::value_type kernel_window[CONFIG_T::filt_width * CONFIG_T::filt_height * CONFIG_T::n_chan]) {
-    #pragma HLS inline
+    //#pragma HLS inline
 
     // Shift kernel_window by one step to the left (manual shift operation)
     static const int filt_width = CONFIG_T::filt_width - 1;
 KernelShiftWidth:
     for (int i_iw = 0; i_iw < filt_width; i_iw++) {
-        #pragma HLS PIPELINE II = 1
+        //#pragma HLS PIPELINE II = 1
     KernelShiftHeight:
         for (unsigned i_ih = 0; i_ih < CONFIG_T::filt_height; i_ih++) {
         KernelShiftChannel:
@@ -203,7 +203,7 @@ KernelShiftWidth:
     static const int lastheight = (CONFIG_T::filt_width - 1) * CONFIG_T::n_chan;
 KernelPushHeight:
     for (int i_ih = 0; i_ih < CONFIG_T::filt_height; i_ih++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
     KernelPushChannel:
         for (int i_ic = 0; i_ic < CONFIG_T::n_chan; i_ic++) {
             kernel_window[lastheight + i_ih * CONFIG_T::filt_width * CONFIG_T::n_chan + i_ic] = shift_buffer[i_ih][i_ic];
@@ -218,15 +218,15 @@ void shift_line_buffer(
                                                                              [CONFIG_T::n_chan],
     typename data_T::value_type kernel_window[CONFIG_T::filt_height * CONFIG_T::filt_width * CONFIG_T::n_chan]) {
 
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
     // Temporary buffer for popped (shifted) elements
     typename data_T::value_type shift_buffer[CONFIG_T::filt_height][CONFIG_T::n_chan];
-    #pragma HLS ARRAY_PARTITION variable = shift_buffer complete dim = 0
+    //#pragma HLS ARRAY_PARTITION variable = shift_buffer complete dim = 0
 
 UpdateBuffer:
     for (int i_ic = 0; i_ic < CONFIG_T::n_chan; i_ic++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
 
         // Insert pixel(s) at end of shift buffer
         shift_buffer[CONFIG_T::filt_height - 1][i_ic] = in_elem[i_ic];
@@ -237,7 +237,7 @@ LineBufferDataIn:
     // Shift the shift buffer into the line buffer
     LineBufferShift:
         for (unsigned i_ih = 1; i_ih < CONFIG_T::filt_height; i_ih++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             typename data_T::value_type pop_elem = line_buffer[i_ih - 1][i_ic].shift(
                 shift_buffer[CONFIG_T::filt_height - i_ih][i_ic]); // Shift the line buffer, return the popped pixel
             shift_buffer[CONFIG_T::filt_height - i_ih - 1][i_ic] =
@@ -255,7 +255,7 @@ void compute_output_buffer_2d(
     hls::stream<res_T> &res_stream,
     typename CONFIG_T::weight_t weights[CONFIG_T::kernel_size * CONFIG_T::n_chan * CONFIG_T::n_filt],
     typename CONFIG_T::bias_t biases[CONFIG_T::n_filt]) {
-    #pragma HLS INLINE OFF
+    //#pragma HLS INLINE OFF
 
     // Thresholds
     const static int lShiftX = CONFIG_T::filt_width - 1;
@@ -269,10 +269,10 @@ void compute_output_buffer_2d(
     static int sY = 0; // Stride Y
 
     static typename data_T::value_type kernel_data[CONFIG_T::filt_height * CONFIG_T::filt_width * CONFIG_T::n_chan];
-    #pragma HLS ARRAY_PARTITION variable = kernel_data complete
+    //#pragma HLS ARRAY_PARTITION variable = kernel_data complete
 
     typename res_T::value_type res_out[CONFIG_T::n_filt];
-    #pragma HLS ARRAY_PARTITION variable = res_out complete dim = 0
+    //#pragma HLS ARRAY_PARTITION variable = res_out complete dim = 0
 
     res_T res_pack;
     PRAGMA_DATA_PACK(res_pack)
@@ -291,7 +291,7 @@ void compute_output_buffer_2d(
     // Pack output
     CastLoop:
         for (unsigned i_ic = 0; i_ic < CONFIG_T::n_filt; i_ic++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             res_pack[i_ic] = res_out[i_ic];
         }
 
@@ -325,7 +325,7 @@ void compute_output_buffer_1d(
     const data_T &in_elem, hls::stream<res_T> &res_stream,
     typename CONFIG_T::weight_t weights[CONFIG_T::kernel_size * CONFIG_T::n_chan * CONFIG_T::n_filt],
     typename CONFIG_T::bias_t biases[CONFIG_T::n_filt]) {
-    #pragma HLS INLINE OFF
+    //#pragma HLS INLINE OFF
 
     // Thresholds
     const static int lShiftX = CONFIG_T::filt_width - 1;
@@ -335,10 +335,10 @@ void compute_output_buffer_1d(
     static int sX = 0; // stride counter
 
     static typename data_T::value_type kernel_data[CONFIG_T::filt_width * CONFIG_T::n_chan];
-    #pragma HLS ARRAY_PARTITION variable = kernel_data complete
+    //#pragma HLS ARRAY_PARTITION variable = kernel_data complete
 
     typename res_T::value_type res_out[CONFIG_T::n_filt];
-    #pragma HLS ARRAY_PARTITION variable = res_out complete dim = 0
+    //#pragma HLS ARRAY_PARTITION variable = res_out complete dim = 0
 
     res_T res_pack;
     PRAGMA_DATA_PACK(res_pack)
@@ -357,7 +357,7 @@ void compute_output_buffer_1d(
     // Pack output
     CastLoop:
         for (unsigned i_ic = 0; i_ic < CONFIG_T::n_filt; i_ic++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             res_pack[i_ic] = res_out[i_ic];
         }
 

@@ -22,7 +22,7 @@ template <class x_T, class w_T> class both_binary : public Product {
   public:
     static x_T product(x_T a, w_T w) {
         // specialisation for 1-bit weights and incoming data
-        #pragma HLS INLINE
+        //#pragma HLS INLINE
         return a == w;
     }
 };
@@ -31,7 +31,7 @@ template <class x_T, class w_T> class weight_binary : public Product {
   public:
     static auto product(x_T a, w_T w) -> decltype(-a) {
         // Specialisation for 1-bit weights, arbitrary data
-        #pragma HLS INLINE
+        //#pragma HLS INLINE
         if (w == 0)
             return -a;
         else
@@ -43,7 +43,7 @@ template <class x_T, class w_T> class data_binary : public Product {
   public:
     static auto product(x_T a, w_T w) -> decltype(-w) {
         // Specialisation for 1-bit data, arbitrary weight
-        #pragma HLS INLINE
+        //#pragma HLS INLINE
         if (a == 0)
             return -w;
         else
@@ -55,7 +55,7 @@ template <class x_T, class w_T> class weight_ternary : public Product {
   public:
     static auto product(x_T a, w_T w) -> decltype(-a) {
         // Specialisation for 2-bit weights, arbitrary data
-        #pragma HLS INLINE
+        //#pragma HLS INLINE
         if (w == 0)
             return 0;
         else if (w == -1)
@@ -69,7 +69,7 @@ template <class x_T, class w_T> class mult : public Product {
   public:
     static auto product(x_T a, w_T w) -> decltype(a * w) {
         // 'Normal' product
-        #pragma HLS INLINE
+        //#pragma HLS INLINE
         return a * w;
     }
 };
@@ -79,7 +79,7 @@ template <class x_T, class w_T> class weight_exponential : public Product {
     using r_T = ap_fixed<2 * (decltype(w_T::weight)::width + x_T::width), (decltype(w_T::weight)::width + x_T::width)>;
     static r_T product(x_T a, w_T w) {
         // Shift product for exponential weights
-        #pragma HLS INLINE
+        //#pragma HLS INLINE
 
         // Shift by the exponent. Negative weights shift right
         r_T y = static_cast<r_T>(a) << w.weight;
@@ -96,7 +96,7 @@ inline typename std::enable_if<std::is_same<data_T, ap_uint<1>>::value &&
                                    std::is_same<typename CONFIG_T::weight_t, ap_uint<1>>::value,
                                ap_int<nnet::ceillog2(CONFIG_T::n_in) + 2>>::type
 cast(typename CONFIG_T::accum_t x) {
-    return static_cast<ap_int<nnet::ceillog2(CONFIG_T::n_in) + 2>>(x * 2 - CONFIG_T::n_in);
+    return (ap_int<nnet::ceillog2(CONFIG_T::n_in) + 2>)(x - CONFIG_T::n_in / 2) * 2;
 }
 
 template <class data_T, class res_T, typename CONFIG_T>

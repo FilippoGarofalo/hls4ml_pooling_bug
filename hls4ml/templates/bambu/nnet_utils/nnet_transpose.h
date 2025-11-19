@@ -28,7 +28,7 @@ template <typename CONFIG_T> unsigned transfer_idx(int index) {
 template <typename data_T, typename res_T, typename CONFIG_T>
 void transpose(const data_T data[CONFIG_T::N], res_T res[CONFIG_T::N]) {
     for (int i = 0; i < CONFIG_T::N; i++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         int idx = transfer_idx<CONFIG_T>(i);
         res[i] = data[idx];
     }

@@ -13,7 +13,7 @@ void add(hls::stream<input1_T> &data1, hls::stream<input2_T> &data2, hls::stream
 
 AddLoop:
     for (int i = 0; i < CONFIG_T::n_elem / input1_T::size; i++) {
-        #pragma HLS PIPELINE
+        //#pragma HLS PIPELINE
 
         input1_T in_data1 = data1.read();
         input2_T in_data2 = data2.read();
@@ -22,7 +22,7 @@ AddLoop:
 
     AddPack:
         for (int j = 0; j < res_T::size; j++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             out_data[j] = in_data1[j] + in_data2[j];
         }
 
@@ -36,7 +36,7 @@ void subtract(hls::stream<input1_T> &data1, hls::stream<input2_T> &data2, hls::s
 
 SubtractLoop:
     for (int i = 0; i < CONFIG_T::n_elem / input1_T::size; i++) {
-        #pragma HLS PIPELINE
+        //#pragma HLS PIPELINE
 
         input1_T in_data1 = data1.read();
         input2_T in_data2 = data2.read();
@@ -45,7 +45,7 @@ SubtractLoop:
 
     SubtractPack:
         for (int j = 0; j < res_T::size; j++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             out_data[j] = in_data1[j] - in_data2[j];
         }
 
@@ -59,7 +59,7 @@ void multiply(hls::stream<input1_T> &data1, hls::stream<input2_T> &data2, hls::s
 
 MultiplyLoop:
     for (int i = 0; i < CONFIG_T::n_elem / input1_T::size; i++) {
-        #pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+        //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
 
         input1_T in_data1 = data1.read();
         input2_T in_data2 = data2.read();
@@ -68,7 +68,7 @@ MultiplyLoop:
 
     MultiplyPack:
         for (int j = 0; j < res_T::size; j++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             out_data[j] = in_data1[j] * in_data2[j];
         }
 
@@ -82,7 +82,7 @@ void average(hls::stream<input1_T> &data1, hls::stream<input2_T> &data2, hls::st
 
 AverageLoop:
     for (int i = 0; i < CONFIG_T::n_elem / input1_T::size; i++) {
-        #pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+        //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
 
         input1_T in_data1 = data1.read();
         input2_T in_data2 = data2.read();
@@ -91,8 +91,8 @@ AverageLoop:
 
     AveragePack:
         for (int j = 0; j < res_T::size; j++) {
-            #pragma HLS UNROLL
-            out_data[j] = (in_data1[j] + in_data2[j]) * ap_ufixed<1, 0>(0.5);
+            //#pragma HLS UNROLL
+            out_data[j] = (in_data1[j] + in_data2[j]) / (typename res_T::value_type)2;
         }
 
         res.write(out_data);
@@ -105,7 +105,7 @@ void maximum(hls::stream<input1_T> &data1, hls::stream<input2_T> &data2, hls::st
 
 MaximumLoop:
     for (int i = 0; i < CONFIG_T::n_elem / input1_T::size; i++) {
-        #pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+        //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
 
         input1_T in_data1 = data1.read();
         input2_T in_data2 = data2.read();
@@ -114,9 +114,8 @@ MaximumLoop:
 
     MaximumPack:
         for (int j = 0; j < res_T::size; j++) {
-            #pragma HLS UNROLL
-            out_data[j] = (in_data1[j] > in_data2[j]) ? static_cast<typename res_T::value_type>(in_data1[j])
-                                                      : static_cast<typename res_T::value_type>(in_data2[j]);
+            //#pragma HLS UNROLL
+            out_data[j] = (in_data1[j] > in_data2[j]) ? in_data1[j] : in_data2[j];
         }
 
         res.write(out_data);
@@ -129,7 +128,7 @@ void minimum(hls::stream<input1_T> &data1, hls::stream<input2_T> &data2, hls::st
 
 MinimumLoop:
     for (int i = 0; i < CONFIG_T::n_elem / input1_T::size; i++) {
-        #pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+        //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
 
         input1_T in_data1 = data1.read();
         input2_T in_data2 = data2.read();
@@ -138,9 +137,8 @@ MinimumLoop:
 
     MinimumPack:
         for (int j = 0; j < res_T::size; j++) {
-            #pragma HLS UNROLL
-            out_data[j] = (in_data1[j] < in_data2[j]) ? static_cast<typename res_T::value_type>(in_data1[j])
-                                                      : static_cast<typename res_T::value_type>(in_data2[j]);
+            //#pragma HLS UNROLL
+            out_data[j] = (in_data1[j] < in_data2[j]) ? in_data1[j] : in_data2[j];
         }
 
         res.write(out_data);
@@ -153,7 +151,7 @@ ConcatLoopHeight1:
     for (int i = 0; i < CONFIG_T::n_elem1_0; i++) {
     ConcatLoopWidth1:
         for (int j = 0; j < CONFIG_T::n_elem1_1; j++) {
-            #pragma HLS PIPELINE II=1
+            //#pragma HLS PIPELINE II=1
 
             input1_T in_data1 = data1.read();
             res_T out_data;
@@ -161,7 +159,7 @@ ConcatLoopHeight1:
 
         ConcatPackInput1:
             for (int k = 0; k < input1_T::size; k++) {
-                #pragma HLS UNROLL
+                //#pragma HLS UNROLL
                 out_data[k] = in_data1[k];
             }
 
@@ -172,7 +170,7 @@ ConcatLoopHeight2:
     for (int i = 0; i < CONFIG_T::n_elem2_0; i++) {
     ConcatLoopWidth2:
         for (int j = 0; j < CONFIG_T::n_elem2_1; j++) {
-            #pragma HLS PIPELINE II=1
+            //#pragma HLS PIPELINE II=1
 
             input2_T in_data2 = data2.read();
             res_T out_data;
@@ -180,7 +178,7 @@ ConcatLoopHeight2:
 
         ConcatPackInput2:
             for (int k = 0; k < input2_T::size; k++) {
-                #pragma HLS UNROLL
+                //#pragma HLS UNROLL
                 out_data[k] = in_data2[k];
             }
 
@@ -195,7 +193,7 @@ ConcatLoopHeight:
     for (int i = 0; i < CONFIG_T::n_elem1_0; i++) {
     ConcatLoopWidth1:
         for (int j = 0; j < CONFIG_T::n_elem1_1; j++) {
-            #pragma HLS PIPELINE II=1
+            //#pragma HLS PIPELINE II=1
 
             input1_T in_data1 = data1.read();
             res_T out_data;
@@ -203,7 +201,7 @@ ConcatLoopHeight:
 
         ConcatPackInput1:
             for (int k = 0; k < input1_T::size; k++) {
-                #pragma HLS UNROLL
+                //#pragma HLS UNROLL
                 out_data[k] = in_data1[k];
             }
 
@@ -211,7 +209,7 @@ ConcatLoopHeight:
         }
     ConcatLoopWidth2:
         for (int j = 0; j < CONFIG_T::n_elem2_1; j++) {
-            #pragma HLS PIPELINE II=1
+            //#pragma HLS PIPELINE II=1
 
             input2_T in_data2 = data2.read();
             res_T out_data;
@@ -219,7 +217,7 @@ ConcatLoopHeight:
 
         ConcatPackInput2:
             for (int k = 0; k < input2_T::size; k++) {
-                #pragma HLS UNROLL
+                //#pragma HLS UNROLL
                 out_data[k] = in_data2[k];
             }
 
@@ -234,7 +232,7 @@ ConcatLoopHeight:
     for (int i = 0; i < CONFIG_T::n_elem1_0; i++) {
     ConcatLoopWidth:
         for (int j = 0; j < CONFIG_T::n_elem1_1; j++) {
-            #pragma HLS PIPELINE II=1
+            //#pragma HLS PIPELINE II=1
 
             input1_T in_data1 = data1.read();
             input2_T in_data2 = data2.read();
@@ -243,13 +241,13 @@ ConcatLoopHeight:
 
         ConcatPackInput1:
             for (int k = 0; k < input1_T::size; k++) {
-                #pragma HLS UNROLL
+                //#pragma HLS UNROLL
                 out_data[k] = in_data1[k];
             }
 
         ConcatPackInput2:
             for (int k = 0; k < input2_T::size; k++) {
-                #pragma HLS UNROLL
+                //#pragma HLS UNROLL
                 out_data[input1_T::size + k] = in_data2[k];
             }
 
@@ -273,7 +271,7 @@ template <class input1_T, class input2_T, class res_T, typename CONFIG_T>
 void concatenate2d_0(hls::stream<input1_T> &data1, hls::stream<input2_T> &data2, hls::stream<res_T> &res) {
 ConcatLoopHeight1:
     for (int i = 0; i < CONFIG_T::n_elem1_0; i++) {
-        #pragma HLS PIPELINE II=1
+        //#pragma HLS PIPELINE II=1
 
         input1_T in_data1 = data1.read();
         res_T out_data;
@@ -281,7 +279,7 @@ ConcatLoopHeight1:
 
     ConcatPackInput1:
         for (int k = 0; k < input1_T::size; k++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             out_data[k] = in_data1[k];
         }
 
@@ -289,7 +287,7 @@ ConcatLoopHeight1:
     }
 ConcatLoopHeight2:
     for (int i = 0; i < CONFIG_T::n_elem2_0; i++) {
-        #pragma HLS PIPELINE II=1
+        //#pragma HLS PIPELINE II=1
 
         input2_T in_data2 = data2.read();
         res_T out_data;
@@ -297,7 +295,7 @@ ConcatLoopHeight2:
 
     ConcatPackInput2:
         for (int k = 0; k < input2_T::size; k++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             out_data[k] = in_data2[k];
         }
 
@@ -309,7 +307,7 @@ template <class input1_T, class input2_T, class res_T, typename CONFIG_T>
 void concatenate2d_1(hls::stream<input1_T> &data1, hls::stream<input2_T> &data2, hls::stream<res_T> &res) {
 ConcatLoopHeight:
     for (int i = 0; i < CONFIG_T::n_elem1_0; i++) {
-        #pragma HLS PIPELINE II=1
+        //#pragma HLS PIPELINE II=1
 
         input1_T in_data1 = data1.read();
         input2_T in_data2 = data2.read();
@@ -318,13 +316,13 @@ ConcatLoopHeight:
 
     ConcatPackInput1:
         for (int k = 0; k < input1_T::size; k++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             out_data[k] = in_data1[k];
         }
 
     ConcatPackInput2:
         for (int k = 0; k < input2_T::size; k++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             out_data[input1_T::size + k] = in_data2[k];
         }
 
@@ -347,21 +345,21 @@ void concatenate1d(hls::stream<input1_T> &data1, hls::stream<input2_T> &data2, h
     PRAGMA_DATA_PACK(out_data)
 ConcatLoop1:
     for (int i = 0; i < CONFIG_T::n_elem1_0 / input1_T::size; i++) {
-        #pragma HLS PIPELINE
+        //#pragma HLS PIPELINE
         input1_T in_data1 = data1.read();
     ConcatPack1:
         for (int j = 0; j < input1_T::size; j++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             out_data[j + (i * input1_T::size)] = in_data1[j];
         }
     }
 ConcatLoop2:
     for (int i = 0; i < CONFIG_T::n_elem2_0 / input2_T::size; i++) {
-        #pragma HLS PIPELINE
+        //#pragma HLS PIPELINE
         input2_T in_data2 = data2.read();
     ConcatPack2:
         for (int j = 0; j < input2_T::size; j++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             out_data[j + (i * input2_T::size) + (CONFIG_T::n_elem1_0)] = in_data2[j];
         }
     }

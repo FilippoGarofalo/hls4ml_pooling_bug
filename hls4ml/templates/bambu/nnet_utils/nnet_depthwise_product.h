@@ -7,31 +7,31 @@ template <class data_T, class res_T, typename CONFIG_T>
 void depthwise_product_latency(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_out],
                                typename CONFIG_T::weight_t weights[CONFIG_T::n_in * CONFIG_T::n_out],
                                typename CONFIG_T::bias_t biases[CONFIG_T::n_out]) {
-    #pragma HLS INLINE
+    //#pragma HLS INLINE
 
     typename CONFIG_T::accum_t mult[CONFIG_T::n_in];
     typename CONFIG_T::accum_t acc[CONFIG_T::n_out];
 
     // Use a function_instantiate in case it helps to explicitly optimize unchanging weights/biases
-    #pragma HLS function_instantiate variable=weights
+    //#pragma HLS function_instantiate variable=weights
 
-    #pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+    //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
 
-    #pragma HLS ARRAY_PARTITION variable=mult complete
+    //#pragma HLS ARRAY_PARTITION variable=mult complete
 
-    #pragma HLS ALLOCATION operation instances=mul limit=CONFIG_T::multiplier_limit
+    //#pragma HLS ALLOCATION operation instances=mul limit=CONFIG_T::multiplier_limit
 
 // Do the matrix-multiply
 Product:
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         mult[ii] = CONFIG_T::template product<data_T, typename CONFIG_T::weight_t>::product(data[ii], weights[ii]);
     }
 
 // Initialize accumulator with input biases
 ResetAccum:
     for (int iacc = 0; iacc < CONFIG_T::n_out; iacc++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         acc[iacc] = (typename CONFIG_T::accum_t)biases[iacc];
     }
 
@@ -48,7 +48,7 @@ Accum1:
 // Cast to "res_t" type
 Result:
     for (int ires = 0; ires < CONFIG_T::n_out; ires++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         res[ires] = cast<data_T, res_T, CONFIG_T>(acc[ires]);
     }
 }
@@ -67,31 +67,31 @@ void depthwise_product_resource_rf_leq_nout(data_T data[CONFIG_T::n_in], res_T r
 
     assert((multiplier_limit == block_factor) && "This function is correct only for RF <= N_CHAN");
 
-    #pragma HLS function_instantiate variable=weights,biases
-    #pragma HLS ARRAY_RESHAPE   variable=weights block factor=block_factor
-    #pragma HLS ARRAY_RESHAPE   variable=data block factor=block_factor
+    //#pragma HLS function_instantiate variable=weights,biases
+    //#pragma HLS ARRAY_RESHAPE   variable=weights block factor=block_factor
+    //#pragma HLS ARRAY_RESHAPE   variable=data block factor=block_factor
 
-    #pragma HLS ARRAY_PARTITION variable=biases complete
+    //#pragma HLS ARRAY_PARTITION variable=biases complete
 
     typename CONFIG_T::accum_t acc[nout];
-    #pragma HLS ARRAY_PARTITION variable=acc complete
+    //#pragma HLS ARRAY_PARTITION variable=acc complete
 
 InitAccum:
     for (int iacc = 0; iacc < nout; iacc++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         acc[iacc] = (typename CONFIG_T::accum_t)biases[iacc];
     }
 
 ReuseLoop:
     for (int ir = 0; ir < rufactor; ir++) {
-        #pragma HLS PIPELINE II=1 rewind
+        //#pragma HLS PIPELINE II=1 rewind
 
         int in_index = ir;
         int out_index = ir;
 
     MultLoop:
         for (int im = 0; im < block_factor; im++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
 
             acc[out_index] += static_cast<typename CONFIG_T::accum_t>(
                 CONFIG_T::template product<data_T, typename CONFIG_T::weight_t>::product(data[in_index], weights[in_index]));
@@ -108,7 +108,7 @@ ReuseLoop:
 // Cast to "res_t" type
 Result:
     for (int ires = 0; ires < nout; ires++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         res[ires] = cast<data_T, res_T, CONFIG_T>(acc[ires]);
     }
 }
@@ -128,18 +128,18 @@ void depthwise_product_resource_rf_gt_nout_rem0(data_T data[CONFIG_T::n_in], res
     assert((rufactor >= nout && rufactor % nout == 0) &&
            "This function is correct only for RF >= N_CHAN && RF % N_CHAN == 0");
 
-    #pragma HLS function_instantiate variable=weights,biases
-    #pragma HLS ARRAY_RESHAPE   variable=weights block factor=block_factor
-    #pragma HLS ARRAY_RESHAPE   variable=data block factor=block_factor
+    //#pragma HLS function_instantiate variable=weights,biases
+    //#pragma HLS ARRAY_RESHAPE   variable=weights block factor=block_factor
+    //#pragma HLS ARRAY_RESHAPE   variable=data block factor=block_factor
 
-    #pragma HLS ARRAY_PARTITION variable=biases complete
+    //#pragma HLS ARRAY_PARTITION variable=biases complete
 
     typename CONFIG_T::accum_t acc[nout];
-    #pragma HLS ARRAY_PARTITION variable=acc complete
+    //#pragma HLS ARRAY_PARTITION variable=acc complete
 
 InitAccum:
     for (int iacc = 0; iacc < nout; iacc++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         acc[iacc] = (typename CONFIG_T::accum_t)biases[iacc];
     }
 
@@ -158,14 +158,14 @@ IndexLoop:
 
 ReuseLoop:
     for (int ir = 0; ir < rufactor; ir++) {
-        #pragma HLS PIPELINE II=1 rewind
+        //#pragma HLS PIPELINE II=1 rewind
 
         int in_index = ir;
         out_index = outidx[ir];
 
     MultLoop:
         for (int im = 0; im < block_factor; im++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
 
             acc[out_index] += static_cast<typename CONFIG_T::accum_t>(
                 CONFIG_T::template product<data_T, typename CONFIG_T::weight_t>::product(data[in_index], weights[in_index]));
@@ -177,7 +177,7 @@ ReuseLoop:
 // Cast to "res_t" type
 Result:
     for (int ires = 0; ires < nout; ires++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         res[ires] = cast<data_T, res_T, CONFIG_T>(acc[ires]);
     }
 }
@@ -193,18 +193,18 @@ void depthwise_product_resource_gt_nout(data_T data[CONFIG_T::n_in], res_T res[C
     const int block_factor = DIV_ROUNDUP(nin, rufactor);
     assert((rufactor > nout) && "This function is correct only for RF > N_CHAN");
 
-    #pragma HLS function_instantiate variable=weights,biases
-    #pragma HLS ARRAY_RESHAPE   variable=weights block factor=block_factor
-    #pragma HLS ARRAY_RESHAPE   variable=data block factor=block_factor
+    //#pragma HLS function_instantiate variable=weights,biases
+    //#pragma HLS ARRAY_RESHAPE   variable=weights block factor=block_factor
+    //#pragma HLS ARRAY_RESHAPE   variable=data block factor=block_factor
 
-    #pragma HLS ARRAY_PARTITION variable=biases complete
+    //#pragma HLS ARRAY_PARTITION variable=biases complete
 
     typename CONFIG_T::accum_t acc[nout];
-    #pragma HLS ARRAY_PARTITION variable=acc complete
+    //#pragma HLS ARRAY_PARTITION variable=acc complete
 
 InitAccum:
     for (int iacc = 0; iacc < nout; iacc++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         acc[iacc] = (typename CONFIG_T::accum_t)biases[iacc];
     }
 
@@ -223,14 +223,14 @@ IndexLoop:
 
 ReuseLoop:
     for (int ir = 0; ir < rufactor; ir++) {
-        #pragma HLS PIPELINE II=1 rewind
+        //#pragma HLS PIPELINE II=1 rewind
 
         int in_index = ir;
         int out_index = outidx[ir];
 
     MultLoop:
         for (int im = 0; im < block_factor; im++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
 
             // out_index = in_index % nout;
             acc[out_index] += static_cast<typename CONFIG_T::accum_t>(
@@ -247,7 +247,7 @@ ReuseLoop:
 // Cast to "res_t" type
 Result:
     for (int ires = 0; ires < nout; ires++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         res[ires] = cast<data_T, res_T, CONFIG_T>(acc[ires]);
     }
 }
@@ -258,7 +258,7 @@ class DepthwiseDenseLatency : public DepthwiseDenseKernel<data_T, res_T, CONFIG_
     static void dense(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_out],
                       typename CONFIG_T::weight_t weights[CONFIG_T::n_in * CONFIG_T::n_out],
                       typename CONFIG_T::bias_t biases[CONFIG_T::n_out]) {
-        #pragma HLS INLINE
+        //#pragma HLS INLINE
         depthwise_product_latency<data_T, res_T, CONFIG_T>(data, res, weights, biases);
     }
 };
@@ -269,7 +269,7 @@ class DepthwiseDenseResource_rf_leq_nout : public DepthwiseDenseKernel<data_T, r
     static void dense(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_out],
                       typename CONFIG_T::weight_t weights[CONFIG_T::n_in * CONFIG_T::n_out],
                       typename CONFIG_T::bias_t biases[CONFIG_T::n_out]) {
-        #pragma HLS INLINE
+        //#pragma HLS INLINE
         depthwise_product_resource_rf_leq_nout<data_T, res_T, CONFIG_T>(data, res, weights, biases);
     }
 };
@@ -280,7 +280,7 @@ class DepthwiseDenseResource_rf_gt_nout_rem0 : public DepthwiseDenseKernel<data_
     static void dense(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_out],
                       typename CONFIG_T::weight_t weights[CONFIG_T::n_in * CONFIG_T::n_out],
                       typename CONFIG_T::bias_t biases[CONFIG_T::n_out]) {
-        #pragma HLS INLINE
+        //#pragma HLS INLINE
         depthwise_product_resource_rf_gt_nout_rem0<data_T, res_T, CONFIG_T>(data, res, weights, biases);
     }
 };
@@ -291,7 +291,7 @@ class DepthwiseDenseResource_rf_gt_nout : public DepthwiseDenseKernel<data_T, re
     static void dense(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_out],
                       typename CONFIG_T::weight_t weights[CONFIG_T::n_in * CONFIG_T::n_out],
                       typename CONFIG_T::bias_t biases[CONFIG_T::n_out]) {
-        #pragma HLS INLINE
+        //#pragma HLS INLINE
         depthwise_product_resource_gt_nout<data_T, res_T, CONFIG_T>(data, res, weights, biases);
     }
 };

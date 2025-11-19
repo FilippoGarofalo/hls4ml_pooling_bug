@@ -28,11 +28,13 @@ ChannelLoop:
 template <class data_T, typename CONFIG_T>
 void read_time_step_3d(unsigned time_step, data_T data[CONFIG_T::n_time_steps * CONFIG_T::in_width * CONFIG_T::n_chan],
                        data_T res[CONFIG_T::in_width * CONFIG_T::n_chan]) {
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
 WidthLoop:
+    #pragma clang loop unroll(full)
     for (int i = 0; i < CONFIG_T::in_width; i++) {
     ChannelLoop:
+        #pragma clang loop unroll(full)
         for (int j = 0; j < CONFIG_T::n_chan; j++) {
             res[i * CONFIG_T::n_chan + j] =
                 data[time_step * CONFIG_T::in_width * CONFIG_T::n_chan + i * CONFIG_T::n_chan + j];
@@ -44,13 +46,16 @@ template <class data_T, typename CONFIG_T>
 void read_time_step_4d(unsigned time_step,
                        data_T data[CONFIG_T::n_time_steps * CONFIG_T::in_height * CONFIG_T::in_width * CONFIG_T::n_chan],
                        data_T res[CONFIG_T::in_height * CONFIG_T::in_width * CONFIG_T::n_chan]) {
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
 HeightLoop:
+    #pragma clang loop unroll(full)
     for (int i = 0; i < CONFIG_T::in_height; i++) {
     WidthLoop:
+        #pragma clang loop unroll(full)
         for (int j = 0; j < CONFIG_T::in_width; j++) {
         ChannelLoop:
+            #pragma clang loop unroll(full)
             for (int k = 0; k < CONFIG_T::n_chan; k++) {
                 res[i * CONFIG_T::in_width * CONFIG_T::n_chan + j * CONFIG_T::n_chan + k] =
                     data[time_step * CONFIG_T::in_height * CONFIG_T::in_width * CONFIG_T::n_chan +
@@ -63,9 +68,10 @@ HeightLoop:
 template <class data_T, typename CONFIG_T>
 void write_time_step_2d(unsigned time_step, data_T data[CONFIG_T::n_chan],
                         data_T res[CONFIG_T::n_time_steps * CONFIG_T::n_chan]) {
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
 ChannelLoop:
+    #pragma clang loop unroll(full)
     for (unsigned i = 0; i < CONFIG_T::n_chan; i++) {
         res[time_step * CONFIG_T::n_chan + i] = data[i];
     }
@@ -74,11 +80,13 @@ ChannelLoop:
 template <class data_T, typename CONFIG_T>
 void write_time_step_3d(unsigned time_step, data_T data[CONFIG_T::in_width * CONFIG_T::n_chan],
                         data_T res[CONFIG_T::n_time_steps * CONFIG_T::in_width * CONFIG_T::n_chan]) {
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
 WidthLoop:
+    #pragma clang loop unroll(full)
     for (int i = 0; i < CONFIG_T::in_width; i++) {
     ChannelLoop:
+        #pragma clang loop unroll(full)
         for (int j = 0; j < CONFIG_T::n_chan; j++) {
             res[time_step * CONFIG_T::in_width * CONFIG_T::n_chan + i * CONFIG_T::n_chan + j] =
                 data[i * CONFIG_T::n_chan + j];
@@ -89,13 +97,16 @@ WidthLoop:
 template <class data_T, typename CONFIG_T>
 void write_time_step_4d(unsigned time_step, data_T data[CONFIG_T::in_height * CONFIG_T::in_width * CONFIG_T::n_chan],
                         data_T res[CONFIG_T::n_time_steps * CONFIG_T::in_height * CONFIG_T::in_width * CONFIG_T::n_chan]) {
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
 HeightLoop:
+    #pragma clang loop unroll(full)
     for (int i = 0; i < CONFIG_T::in_height; i++) {
     WidthLoop:
+        #pragma clang loop unroll(full)
         for (int j = 0; j < CONFIG_T::in_width; j++) {
         ChannelLoop:
+            #pragma clang loop unroll(full)
             for (int k = 0; k < CONFIG_T::n_chan; k++) {
                 res[time_step * CONFIG_T::in_height * CONFIG_T::in_width * CONFIG_T::n_chan +
                     i * CONFIG_T::in_width * CONFIG_T::n_chan + j * CONFIG_T::n_chan + k] =

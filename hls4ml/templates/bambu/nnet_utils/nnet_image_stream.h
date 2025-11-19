@@ -14,19 +14,19 @@ template <class data_T, typename CONFIG_T> void resize_nearest(hls::stream<data_
 
 ImageHeight:
     for (unsigned h = 0; h < CONFIG_T::height; h++) {
-        #pragma HLS PIPELINE
+        //#pragma HLS PIPELINE
 
         data_T data_in_row[CONFIG_T::width];
 
     ImageWidth:
         for (unsigned i = 0; i < CONFIG_T::width; i++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
 
             data_T in_data = image.read();
 
         ImageChan:
             for (unsigned j = 0; j < CONFIG_T::n_chan; j++) {
-                #pragma HLS UNROLL
+                //#pragma HLS UNROLL
 
                 data_in_row[i][j] = in_data[j];
             }
@@ -34,22 +34,22 @@ ImageHeight:
 
     ResizeHeight:
         for (unsigned i = 0; i < ratio_height; i++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
 
         ImageWidth2:
             for (unsigned l = 0; l < CONFIG_T::width; l++) {
-                #pragma HLS UNROLL
+                //#pragma HLS UNROLL
 
             ResizeWidth:
                 for (unsigned j = 0; j < ratio_width; j++) {
-                    #pragma HLS UNROLL
+                    //#pragma HLS UNROLL
 
                     data_T out_data;
                     PRAGMA_DATA_PACK(out_data)
 
                 ResizeChan:
                     for (unsigned k = 0; k < CONFIG_T::n_chan; k++) {
-                        #pragma HLS UNROLL
+                        //#pragma HLS UNROLL
 
                         out_data[k] = data_in_row[l][k];
                     }

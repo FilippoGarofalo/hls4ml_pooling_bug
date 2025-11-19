@@ -48,9 +48,9 @@ template <class data_T, class res_T, typename CONFIG_T>
 void layernorm_1d(data_T data[CONFIG_T::n_in / CONFIG_T::seq_len], res_T res[CONFIG_T::n_in / CONFIG_T::seq_len],
                   typename CONFIG_T::scale_t scale[CONFIG_T::n_in / CONFIG_T::seq_len],
                   typename CONFIG_T::bias_t bias[CONFIG_T::n_in / CONFIG_T::seq_len]) {
-    #pragma HLS PIPELINE II=CONFIG_T::reuse_factor
-    #pragma HLS ARRAY_PARTITION variable=data complete
-    #pragma HLS ARRAY_PARTITION variable=res complete
+    //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+    //#pragma HLS ARRAY_PARTITION variable=data complete
+    //#pragma HLS ARRAY_PARTITION variable=res complete
     int inv_range_inv = (int)1 << CONFIG_T::table_range_power2;
     typename CONFIG_T::table_t deno_inver = 0;
 #ifdef __HLS_SYN__
@@ -71,17 +71,19 @@ void layernorm_1d(data_T data[CONFIG_T::n_in / CONFIG_T::seq_len], res_T res[CON
     typename CONFIG_T::accum_t var, mean, diff;
     typename CONFIG_T::accum_t data_diff[dim];
 
-    #pragma HLS ARRAY_PARTITION variable=data_diff complete
+    //#pragma HLS ARRAY_PARTITION variable=data_diff complete
 
     const typename CONFIG_T::accum_t k_inv = 1.0 / dim;
 
 LAYERNORM_1D_SUM:
+    #pragma clang loop unroll(full)
     for (int i = 0; i < dim; ++i) {
         sum_cache += static_cast<typename CONFIG_T::accum_t>(data[i]);
     }
     mean = CONFIG_T::template product<typename CONFIG_T::accum_t, typename CONFIG_T::accum_t>::product(sum_cache, k_inv);
 
 LAYERNORM_1D_VAR:
+    #pragma clang loop unroll(full)
     for (int i = 0; i < dim; ++i) {
         data_diff[i] = static_cast<typename CONFIG_T::accum_t>(data[i]) - mean;
         diff = data_diff[i] * data_diff[i];
@@ -97,6 +99,7 @@ LAYERNORM_1D_VAR:
     deno_inver = invert_sqr_table[index];
 
 LAYERNORM_1D_RESULT:
+    #pragma clang loop unroll(full)
     for (int i = 0; i < dim; ++i) {
         res[i] = data_diff[i] * deno_inver * scale[i] + bias[i];
     }
@@ -110,23 +113,25 @@ void layernormalize(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in],
     data_T in_val[dim];
     res_T outval[dim];
 
-    #pragma HLS ARRAY_PARTITION variable=scale complete
-    #pragma HLS ARRAY_PARTITION variable=bias complete
-    #pragma HLS ARRAY_PARTITION variable=in_val complete
-    #pragma HLS ARRAY_PARTITION variable=outval complete
+    //#pragma HLS ARRAY_PARTITION variable=scale complete
+    //#pragma HLS ARRAY_PARTITION variable=bias complete
+    //#pragma HLS ARRAY_PARTITION variable=in_val complete
+    //#pragma HLS ARRAY_PARTITION variable=outval complete
 
 LAYERNORM_SEQ_LOOP:
     for (int j = 0; j < CONFIG_T::seq_len; ++j) {
-        #pragma HLS PIPELINE
+        //#pragma HLS PIPELINE
     LAYERNORM_LOAD:
+        #pragma clang loop unroll(full)
         for (int i = 0; i < dim; ++i) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             in_val[i] = data[j * dim + i];
         }
         layernorm_1d<data_T, res_T, CONFIG_T>(in_val, outval, scale, bias);
     LAYERNORM_STORE:
+        #pragma clang loop unroll(full)
         for (int i = 0; i < dim; ++i) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             res[j * dim + i] = outval[i];
         }
     }
