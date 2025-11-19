@@ -1,5 +1,7 @@
 import os
-import sys
+import shlex
+import shutil
+import subprocess
 from warnings import warn
 
 import numpy as np
@@ -41,7 +43,7 @@ from hls4ml.model.types import (
     RoundingMode,
     SaturationMode,
 )
-from hls4ml.report import parse_vivado_report
+from hls4ml.report import parse_bambu_report
 from hls4ml.utils import attribute_descriptions as descriptions
 from hls4ml.utils.einsum_utils import parse_einsum
 
@@ -298,38 +300,164 @@ class BambuBackend(FPGABackend):
     def build(
         self,
         model,
-        reset=False,
-        csim=True,
-        synth=True,
-        cosim=False,
-        validation=False,
-        export=False,
-        vsynth=False,
-        fifo_opt=False,
+        command=None,
+        args=None,
+        *,
+        capture_output=False,
+        check=False,
+        dry_run=False,
+        cwd=None,
+        env=None,
+        run_kwargs=None,
+        parse_report=True,
     ):
-        # For now, use the same build process as Vivado
-        # This can be customized later for Bambu-specific build commands
-        if 'linux' in sys.platform:
-            found = os.system('command -v vivado_hls > /dev/null')
-            if found != 0:
-                raise Exception('Vivado HLS installation not found. Make sure "vivado_hls" is on PATH.')
+        """Forward arbitrary commands to the ``bambu`` executable.
 
-        curr_dir = os.getcwd()
-        os.chdir(model.config.get_output_dir())
-        vivado_cmd = (
-            f'vivado_hls -f build_prj.tcl "reset={reset} '
-            f'csim={csim} '
-            f'synth={synth} '
-            f'cosim={cosim} '
-            f'validation={validation} '
-            f'export={export} '
-            f'vsynth={vsynth} '
-            f'fifo_opt={fifo_opt}"'
+        Args:
+            model (ModelGraph): Model to be built with Bambu.
+            command (str | Sequence[str] | None): Complete command string or token sequence.
+                When omitted, ``args`` must be provided.
+            args (str | Sequence[str] | None): Arguments appended to ``bambu`` if ``command`` is not given.
+            capture_output (bool): If ``True``, capture ``stdout``/``stderr`` and return them.
+            check (bool): If ``True``, raise ``CalledProcessError`` when the command fails.
+            dry_run (bool): If ``True``, return the resolved command without executing it.
+            cwd (str | None): Working directory for the command. Defaults to the model output directory.
+            env (Mapping[str, str] | None): Environment overrides applied to the subprocess.
+            run_kwargs (dict | None): Additional keyword arguments forwarded to ``subprocess.run``.
+            parse_report (bool): If ``True``, parse any ``bambu_results_*.xml`` files in the working directory.
+
+        Returns:
+            dict: Execution metadata, containing ``command``, ``command_str``, ``cwd``,
+            ``returncode``, and any captured ``stdout``/``stderr``. When ``parse_report`` is enabled,
+            the parsed XML contents are returned under the ``report`` key.
+
+        Examples:
+            Basic usage with a command string::
+
+                result = model.build(
+                    command='firmware/myproject.cpp --simulate --clock-period=5'
+                )
+
+            Using args parameter (``bambu`` executable is automatically prepended)::
+
+                result = model.build(
+                    args=['firmware/myproject.cpp', '--simulate', '--clock-period=5']
+                )
+
+            Capture output for inspection::
+
+                result = model.build(
+                    args=['firmware/myproject.cpp', '--simulate'],
+                    capture_output=True
+                )
+                print(result['stdout'])
+        """
+
+        if run_kwargs is None:
+            run_kwargs = {}
+        if not isinstance(run_kwargs, dict):
+            raise TypeError('run_kwargs must be a mapping')
+
+        if command is not None or args is not None:
+            command_tokens = self._normalize_bambu_command(command, args)
+        else:
+            raise ValueError('No Bambu command specified. Provide "command" or "args".')
+
+        target_cwd = cwd or model.config.get_output_dir()
+        if target_cwd is None:
+            target_cwd = os.getcwd()
+        if not os.path.isdir(target_cwd):
+            raise FileNotFoundError(f'Working directory "{target_cwd}" does not exist.')
+
+        if not dry_run:
+            self._ensure_bambu_available()
+
+        command_str = ' '.join(shlex.quote(str(token)) for token in command_tokens)
+
+        if dry_run:
+            return {
+                'command': command_tokens,
+                'command_str': command_str,
+                'cwd': target_cwd,
+                'dry_run': True,
+                'report': parse_bambu_report(target_cwd) if parse_report else None,
+            }
+
+        run_env = os.environ.copy()
+        if env is not None:
+            if not hasattr(env, 'items'):
+                raise TypeError('env must be a mapping of environment variables.')
+            for key, value in env.items():
+                if value is None:
+                    run_env.pop(str(key), None)
+                else:
+                    run_env[str(key)] = str(value)
+
+        run_kwargs = dict(run_kwargs)
+        if capture_output and any(stream in run_kwargs for stream in ('stdout', 'stderr')):
+            raise ValueError('Cannot set stdout/stderr in run_kwargs when capture_output=True.')
+        run_kwargs.setdefault('text', True)
+        if capture_output:
+            run_kwargs['capture_output'] = True
+
+        completed = subprocess.run(
+            command_tokens,
+            cwd=target_cwd,
+            env=run_env,
+            check=check,
+            **run_kwargs,
         )
-        os.system(vivado_cmd)
-        os.chdir(curr_dir)
 
-        return parse_vivado_report(model.config.get_output_dir())
+        report_data = parse_bambu_report(target_cwd) if parse_report else None
+
+        result = {
+            'command': command_tokens,
+            'command_str': command_str,
+            'cwd': target_cwd,
+            'returncode': completed.returncode,
+            'report': report_data,
+        }
+        if capture_output:
+            result['stdout'] = completed.stdout
+            result['stderr'] = completed.stderr
+
+        return result
+
+    @staticmethod
+    def _ensure_bambu_available():
+        if shutil.which('bambu') is None:
+            raise EnvironmentError('Bambu HLS installation not found. Make sure "bambu" is on PATH.')
+
+    @staticmethod
+    def _normalize_bambu_command(command, args=None):
+        if command is not None and args is not None:
+            raise ValueError('Specify only one of "command" or "args".')
+
+        if command is not None:
+            if isinstance(command, (list, tuple)):
+                tokens = [str(token) for token in command]
+            else:
+                command_str = str(command).strip()
+                if not command_str:
+                    raise ValueError('Command string is empty.')
+                tokens = shlex.split(command_str)
+        elif args is not None:
+            if isinstance(args, (list, tuple)):
+                tokens = ['bambu'] + [str(token) for token in args]
+            elif isinstance(args, str):
+                tokens = ['bambu'] + shlex.split(args)
+            else:
+                raise TypeError('args must be a string or a sequence of strings.')
+        else:
+            tokens = []
+
+        if not tokens:
+            raise ValueError('Unable to derive Bambu command.')
+
+        if tokens[0] != 'bambu':
+            tokens.insert(0, 'bambu')
+
+        return tokens
 
     @layer_optimizer(Layer)
     def init_base_layer(self, layer):

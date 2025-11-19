@@ -148,3 +148,22 @@ def test_report(hls_model_setup, capsys):
     captured = capsys.readouterr()  # capture again to test
 
     assert captured.out == backend_config['expected_outcome']
+
+
+def test_bambu_report(tmp_path):
+    """Tests parsing of Bambu XML reports."""
+    output_dir = tmp_path / 'bambu'
+    output_dir.mkdir()
+    sample_report = test_root_path / 'test_report/Bambu/bambu_results_0.xml'
+    shutil.copy(sample_report, output_dir / 'bambu_results_0.xml')
+
+    report = hls4ml.report.parse_bambu_report(str(output_dir))
+
+    assert report is not None
+    assert len(report['results']) == 1
+
+    latest_metrics = report['latest']['metrics']
+    assert latest_metrics['AREA'] == 67
+    assert latest_metrics['SLICE'] == 17
+    assert latest_metrics['DSPS'] == 0
+    assert latest_metrics['PERIOD'] == pytest.approx(2.192)

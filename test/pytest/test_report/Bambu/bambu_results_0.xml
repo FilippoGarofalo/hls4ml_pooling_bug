@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<bambu_results bambu_args="bambu --top-fname=top --evaluation --generate-tb=tb.c bambu_sample.c " bambu_version="Version: PandA 2024.10 - Revision c2ba6936ca2ed63137095fea0b630a1c66e20e63-HEAD" timestamp="2025-11-19T13:57:58" benchmark_name="top_0">
+  <AREA value="67"/>
+  <SLICE value="17"/>
+  <SLICE_LUTS value="67"/>
+  <AREAxTIME value="0.29372800000000004"/>
+  <BRAMS value="0"/>
+  <CLOCK_SLACK value="7.8079999999999998"/>
+  <CYCLES value="2"/>
+  <DRAMS value="0"/>
+  <DSPS value="0"/>
+  <FREQUENCY value="456.20437956204375"/>
+  <PERIOD value="2.1920000000000002"/>
+  <REGISTERS value="3"/>
+  <TIME value="0.0043840000000000007"/>
+  <TOTAL_CYCLES value="2"/>
+  <TOTAL_TIME value="0.0043840000000000007"/>
+  <HLS_execution_time value="2.12999999999999999989"/>
+</bambu_results>
+
