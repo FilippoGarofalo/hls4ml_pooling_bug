@@ -30,9 +30,11 @@ void embedding(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in * CONFIG_T:
     //#pragma HLS ARRAY_PARTITION variable=embeddings complete
 
 InputSequence:
+    #pragma clang loop unroll(full)
     for (int j = 0; j < CONFIG_T::n_in; j++) {
     //#pragma HLS UNROLL
     DenseEmbedding:
+        #pragma clang loop unroll(full)
         for (int i = 0; i < CONFIG_T::n_out; i++) {
             //#pragma HLS UNROLL
             res[j * CONFIG_T::n_out + i] = embeddings[data[j] * CONFIG_T::n_out + i];

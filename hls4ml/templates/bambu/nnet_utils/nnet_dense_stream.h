@@ -26,7 +26,7 @@ void dense_resource_wrapper(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_o
 
 template <class data_T, typename CONFIG_T>
 void data_prepare(hls::stream<data_T> &data_stream, typename data_T::value_type data[CONFIG_T::n_in]) {
-    //#pragma HLS INLINE
+    #pragma HLS INLINE
 
     if (CONFIG_T::n_in / data_T::size > 1) {
     DataPrepare:
@@ -34,6 +34,7 @@ void data_prepare(hls::stream<data_T> &data_stream, typename data_T::value_type 
             //#pragma HLS PIPELINE
             data_T data_pack = data_stream.read();
         DataPackPipeline:
+            #pragma clang loop unroll(full)
             for (int i_pack = 0; i_pack < data_T::size; i_pack++) {
                 //#pragma HLS UNROLL
                 data[i_in * data_T::size + i_pack] = data_pack[i_pack];
@@ -42,6 +43,7 @@ void data_prepare(hls::stream<data_T> &data_stream, typename data_T::value_type 
     } else {
         data_T data_pack = data_stream.read();
     DataPackSingle:
+        #pragma clang loop unroll(full)
         for (int i_pack = 0; i_pack < data_T::size; i_pack++) {
             //#pragma HLS UNROLL
             data[i_pack] = data_pack[i_pack];
@@ -51,7 +53,7 @@ void data_prepare(hls::stream<data_T> &data_stream, typename data_T::value_type 
 
 template <class res_T, typename CONFIG_T>
 void res_write(typename res_T::value_type res[CONFIG_T::n_out], hls::stream<res_T> &res_stream) {
-    //#pragma HLS INLINE
+    #pragma HLS INLINE
 
     if (CONFIG_T::n_out / res_T::size > 1) {
     ResWrite:
@@ -60,6 +62,7 @@ void res_write(typename res_T::value_type res[CONFIG_T::n_out], hls::stream<res_
             res_T res_pack;
             PRAGMA_DATA_PACK(res_pack)
         ResPackPipeline:
+            #pragma clang loop unroll(full)
             for (int i_pack = 0; i_pack < res_T::size; i_pack++) {
                 //#pragma HLS UNROLL
                 res_pack[i_pack] = res[i_out * res_T::size + i_pack];
@@ -70,6 +73,7 @@ void res_write(typename res_T::value_type res[CONFIG_T::n_out], hls::stream<res_
         res_T res_pack;
         PRAGMA_DATA_PACK(res_pack)
     ResPackSingle:
+        #pragma clang loop unroll(full)
         for (int i_pack = 0; i_pack < res_T::size; i_pack++) {
             //#pragma HLS UNROLL
             res_pack[i_pack] = res[i_pack];
@@ -82,7 +86,7 @@ template <class data_T, class res_T, typename CONFIG_T>
 void dense(hls::stream<data_T> &data_stream, hls::stream<res_T> &res_stream,
            typename CONFIG_T::weight_t weights[CONFIG_T::n_in * CONFIG_T::n_out],
            typename CONFIG_T::bias_t biases[CONFIG_T::n_out]) {
-    //#pragma HLS INLINE recursive
+    #pragma HLS INLINE recursive
 
     typename data_T::value_type data[CONFIG_T::n_in];
     //#pragma HLS ARRAY_PARTITION variable=data complete

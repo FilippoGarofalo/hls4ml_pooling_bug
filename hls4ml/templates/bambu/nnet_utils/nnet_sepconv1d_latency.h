@@ -41,6 +41,7 @@ PartitionLoop:
         CONFIG_T::template fill_buffer<data_T, CONFIG_T>::fill_buffer(data, data_buf, i_part);
 
     PixelLoop:
+        #pragma clang loop unroll(full)
         for (unsigned i_pxl = 0; i_pxl < CONFIG_T::n_pixels; i_pxl++) {
             //#pragma HLS UNROLL
 
@@ -48,6 +49,7 @@ PartitionLoop:
 
         // Do the matrix-multiply
         Product:
+            #pragma clang loop unroll(full)
             for (int i_in = 0; i_in < mult_n_in; i_in++) {
                 //#pragma HLS UNROLL
                 cache = data_buf[i_pxl][i_in];
@@ -58,6 +60,7 @@ PartitionLoop:
 
         // Initialize accumulator with input biases
         ResetAccum:
+            #pragma clang loop unroll(full)
             for (int i_acc = 0; i_acc < mult_n_out; i_acc++) {
                 //#pragma HLS UNROLL
                 acc[i_acc] = (typename CONFIG_T::accum_t)biases[i_acc];
@@ -65,9 +68,11 @@ PartitionLoop:
 
         // Accumulate multiplication result
         Accum1:
+            #pragma clang loop unroll(full)
             for (int i_in = 0; i_in < mult_n_acc; i_in++) {
                 //#pragma HLS UNROLL
             Accum2:
+                #pragma clang loop unroll(full)
                 for (int i_out = 0; i_out < mult_n_out; i_out++) {
                     //#pragma HLS UNROLL
                     acc[i_out] += mult[i_in * mult_n_out + i_out];
@@ -76,6 +81,7 @@ PartitionLoop:
 
         // Cast to "res_t" type
         Result:
+            #pragma clang loop unroll(full)
             for (int i_res = 0; i_res < mult_n_out; i_res++) {
                 //#pragma HLS UNROLL
                 *(res++) = cast<data_T, res_T, typename CONFIG_T::mult_config>(acc[i_res]);

@@ -99,7 +99,7 @@ void depthwise_conv_2d_cl(
     typename CONFIG_T::bias_t biases[CONFIG_T::n_chan]) {
     assert(CONFIG_T::implementation == conv_implementation::linebuffer &&
            "Only \"linebuffer\" implementation is supported in Vitis HLS.");
-    //#pragma HLS inline recursive
+    #pragma HLS inline recursive
     depthwise_conv_2d_buffer_cl<data_T, res_T, CONFIG_T>(data, res, weights, biases);
 }
 

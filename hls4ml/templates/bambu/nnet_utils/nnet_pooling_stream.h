@@ -15,7 +15,7 @@ namespace nnet {
 // *************************************************
 
 template <class T, int N, class CONFIG_T> T reduce_pool(T x[N]) {
-    //#pragma HLS INLINE
+    #pragma HLS INLINE
     if (CONFIG_T::pool_op == Max) {
         Op_max<T> op_max;
         return reduce<T, N, Op_max<T>>(x, op_max);
@@ -31,7 +31,7 @@ void compute_pool_buffer_2d(const data_T &in_elem,
                             ap_shift_reg<typename data_T::value_type, CONFIG_T::in_width>
                                 line_buffer[MAX(CONFIG_T::pool_height - 1, 1)][CONFIG_T::n_filt],
                             hls::stream<res_T> &res) {
-    //#pragma HLS INLINE
+    #pragma HLS INLINE
     const static int lShiftX = CONFIG_T::pool_width - 1;
     const static int lShiftY = CONFIG_T::pool_height - 1;
     static int pX = 0; // pixel X
@@ -97,7 +97,7 @@ void pooling2d_cl(hls::stream<data_T> &data, hls::stream<res_T> &res) {
     assert(CONFIG_T::implementation == conv_implementation::linebuffer &&
            "Only \"linebuffer\" implementation is supported in Vitis HLS.");
 
-    //#pragma HLS INLINE recursive
+    #pragma HLS INLINE recursive
     assert(CONFIG_T::pad_top == 0 && CONFIG_T::pad_bottom == 0 && CONFIG_T::pad_left == 0 && CONFIG_T::pad_right == 0);
     assert(CONFIG_T::pool_height == CONFIG_T::stride_height && CONFIG_T::pool_width == CONFIG_T::stride_width);
 
@@ -122,7 +122,7 @@ ReadInputHeight:
 // *************************************************
 template <class data_T, class res_T, typename CONFIG_T>
 void compute_pool_buffer_1d(const data_T &in_elem, hls::stream<res_T> &res) {
-    //#pragma HLS INLINE
+    #pragma HLS INLINE
     const static int lShiftX = CONFIG_T::pool_width - 1;
     // Counters
     static int pX = 0;
@@ -179,7 +179,7 @@ void pooling1d_cl(hls::stream<data_T> &data, hls::stream<res_T> &res) {
            "Only \"linebuffer\" implementation is supported in Vitis HLS.");
     assert(CONFIG_T::pad_left == 0 && CONFIG_T::pad_right == 0);
 
-    //#pragma HLS inline recursive
+    #pragma HLS inline recursive
 
 ReadInputWidth:
     for (unsigned i_iw = 0; i_iw < CONFIG_T::n_in; i_iw++) {
@@ -193,7 +193,7 @@ ReadInputWidth:
 // *************************************************
 
 template <class T, int N, class CONFIG_T> T reduce_global_pool(T x, T y[N]) {
-    //#pragma HLS INLINE
+    #pragma HLS INLINE
     if (CONFIG_T::pool_op == Max) {
         Op_max<T> op_max;
         T y_max = reduce<T, N, Op_max<T>>(y, op_max);
@@ -208,6 +208,7 @@ template <class T, int N, class CONFIG_T> T reduce_global_pool(T x, T y[N]) {
 template <class data_T, class res_T, typename CONFIG_T>
 void compute_global_pool(const data_T &in_elem, typename CONFIG_T::accum_t data_window[CONFIG_T::n_filt]) {
 PoolFilt:
+    #pragma clang loop unroll(full)
     for (unsigned c = 0; c < CONFIG_T::n_filt; c++) {
         //#pragma HLS UNROLL
 
@@ -215,6 +216,7 @@ PoolFilt:
         //#pragma HLS ARRAY_PARTITION variable=data_pack complete dim=0
 
     PixelLoop:
+        #pragma clang loop unroll(full)
         for (unsigned p = 0; p < data_T::size / CONFIG_T::n_filt; p++) {
             //#pragma HLS UNROLL
             data_pack[p] = in_elem[p * CONFIG_T::n_filt + c];
@@ -238,6 +240,7 @@ void global_pooling2d_cl(hls::stream<data_T> &data, hls::stream<res_T> &res) {
     }
 
 PoolInitLoop:
+    #pragma clang loop unroll(full)
     for (unsigned i_init = 0; i_init < CONFIG_T::n_filt; i_init++) {
         //#pragma HLS UNROLL
         data_window[i_init] = init;
@@ -246,6 +249,7 @@ PoolInitLoop:
 ReadInputHeight:
     for (unsigned i_ih = 0; i_ih < CONFIG_T::in_height; i_ih++) {
     ReadInputWidth:
+        #pragma clang loop unroll(full)
         for (unsigned i_iw = 0; i_iw < CONFIG_T::in_width / (data_T::size / CONFIG_T::n_filt); i_iw++) {
             //#pragma HLS LOOP_FLATTEN
             compute_global_pool<data_T, res_T, CONFIG_T>(data.read(), data_window);
@@ -260,6 +264,7 @@ ReadInputHeight:
             res_T res_pack;
             PRAGMA_DATA_PACK(res_pack)
         MaxPoolPack:
+            #pragma clang loop unroll(full)
             for (unsigned i_pack = 0; i_pack < res_T::size; i_pack++) {
                 //#pragma HLS UNROLL
                 res_pack[i_pack] = data_window[i_pack];
@@ -274,6 +279,7 @@ ReadInputHeight:
             res_T res_pack;
             PRAGMA_DATA_PACK(res_pack)
         AvgPoolPack:
+            #pragma clang loop unroll(full)
             for (unsigned i_pack = 0; i_pack < res_T::size; i_pack++) {
                 //#pragma HLS UNROLL
                 res_pack[i_pack] = data_window[i_pack] / (CONFIG_T::in_height * CONFIG_T::in_width);
@@ -297,6 +303,7 @@ void global_pooling1d_cl(hls::stream<data_T> &data, hls::stream<res_T> &res) {
     }
 
 PoolInitLoop:
+    #pragma clang loop unroll(full)
     for (unsigned i_init = 0; i_init < CONFIG_T::n_filt; i_init++) {
         //#pragma HLS UNROLL
         data_window[i_init] = init;
@@ -316,6 +323,7 @@ ReadInput:
             res_T res_pack;
             PRAGMA_DATA_PACK(res_pack)
         MaxPoolPack:
+            #pragma clang loop unroll(full)
             for (unsigned i_pack = 0; i_pack < res_T::size; i_pack++) {
                 //#pragma HLS UNROLL
                 res_pack[i_pack] = data_window[i_pack];
@@ -330,6 +338,7 @@ ReadInput:
             res_T res_pack;
             PRAGMA_DATA_PACK(res_pack)
         AvgPoolPack:
+            #pragma clang loop unroll(full)
             for (unsigned i_pack = 0; i_pack < res_T::size; i_pack++) {
                 //#pragma HLS UNROLL
                 res_pack[i_pack] = data_window[i_pack] / CONFIG_T::n_in;

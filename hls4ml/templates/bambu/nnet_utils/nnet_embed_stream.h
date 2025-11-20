@@ -20,6 +20,7 @@ InputSequence:
         PRAGMA_DATA_PACK(res_pack)
 
     DenseEmbedding:
+        #pragma clang loop unroll(full)
         for (int i = 0; i < CONFIG_T::n_out; i++) {
             //#pragma HLS UNROLL
             res_pack[i] = embeddings[in_data[j] * CONFIG_T::n_out + i];

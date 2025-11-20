@@ -38,16 +38,19 @@ void conv_2d_resource_cl(
     //#pragma HLS ARRAY_PARTITION variable=acc complete dim=0
 
 PartitionLoop:
+    #pragma clang loop unroll(full)
     for (unsigned i_part = 0; i_part < CONFIG_T::n_partitions; i_part++) {
         //#pragma HLS UNROLL // We don't want this loop unrolled
 
         CONFIG_T::template fill_buffer<data_T, CONFIG_T>::fill_buffer(data, data_buf, i_part);
 
     PixelInitAccumLoop:
+        #pragma clang loop unroll(full)
         for (unsigned i_pxl = 0; i_pxl < CONFIG_T::n_pixels; i_pxl++) {
             //#pragma HLS UNROLL
 
         InitAccumLoop:
+            #pragma clang loop unroll(full)
             for (unsigned i_acc = 0; i_acc < mult_n_out; i_acc++) {
                 //#pragma HLS UNROLL
                 acc[i_pxl][i_acc] = (typename CONFIG_T::accum_t)biases[i_acc];
@@ -55,6 +58,7 @@ PartitionLoop:
         }
 
     ReuseLoop:
+        #pragma clang loop unroll(full)
         for (unsigned i_rf = 0; i_rf < CONFIG_T::reuse_factor; i_rf++) {
             //#pragma HLS PIPELINE II=1 rewind
 
@@ -63,10 +67,12 @@ PartitionLoop:
             unsigned i_acc = 0;
 
         MultLoop:
+            #pragma clang loop unroll(full)
             for (unsigned i_blk = 0; i_blk < block_factor; i_blk++) {
                 //#pragma HLS UNROLL
 
             PixelMultLoop:
+                #pragma clang loop unroll(full)
                 for (unsigned i_pxl = 0; i_pxl < CONFIG_T::n_pixels; i_pxl++) {
                     //#pragma HLS UNROLL
 
@@ -91,10 +97,12 @@ PartitionLoop:
         }
 
     PixelResultLoop:
+        #pragma clang loop unroll(full)
         for (unsigned i_pxl = 0; i_pxl < CONFIG_T::n_pixels; i_pxl++) {
         //#pragma HLS UNROLL
         // Cast to "res_t" type
         ResultLoop:
+            #pragma clang loop unroll(full)
             for (unsigned i_res = 0; i_res < mult_n_out; i_res++) {
                 //#pragma HLS UNROLL
                 res[i_part * CONFIG_T::n_pixels * mult_n_out + i_pxl * mult_n_out + i_res] =

@@ -19,12 +19,14 @@ ImageHeight:
         data_T data_in_row[CONFIG_T::width];
 
     ImageWidth:
+        #pragma clang loop unroll(full)
         for (unsigned i = 0; i < CONFIG_T::width; i++) {
             //#pragma HLS UNROLL
 
             data_T in_data = image.read();
 
         ImageChan:
+            #pragma clang loop unroll(full)
             for (unsigned j = 0; j < CONFIG_T::n_chan; j++) {
                 //#pragma HLS UNROLL
 
@@ -33,14 +35,17 @@ ImageHeight:
         }
 
     ResizeHeight:
+        #pragma clang loop unroll(full)
         for (unsigned i = 0; i < ratio_height; i++) {
             //#pragma HLS UNROLL
 
         ImageWidth2:
+            #pragma clang loop unroll(full)
             for (unsigned l = 0; l < CONFIG_T::width; l++) {
                 //#pragma HLS UNROLL
 
             ResizeWidth:
+                #pragma clang loop unroll(full)
                 for (unsigned j = 0; j < ratio_width; j++) {
                     //#pragma HLS UNROLL
 
@@ -48,6 +53,7 @@ ImageHeight:
                     PRAGMA_DATA_PACK(out_data)
 
                 ResizeChan:
+                    #pragma clang loop unroll(full)
                     for (unsigned k = 0; k < CONFIG_T::n_chan; k++) {
                         //#pragma HLS UNROLL
 

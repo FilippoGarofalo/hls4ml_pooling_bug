@@ -504,7 +504,7 @@ void softmax_argmax(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
 
 template <class data_T, class res_T, typename CONFIG_T>
 void softmax(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
-    //#pragma HLS inline
+    #pragma HLS inline
     switch (CONFIG_T::implementation) {
     case softmax_implementation::latency:
         softmax_latency<data_T, res_T, CONFIG_T>(data, res);
@@ -613,6 +613,7 @@ template <class data_T, class res_T, typename CONFIG_T>
 void hard_tanh(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
     if (CONFIG_T::io_type == io_parallel) {
         //#pragma HLS PIPELINE
+        /// TO BE RECONSIDERED FF
     }
 
     #pragma clang loop unroll(full)

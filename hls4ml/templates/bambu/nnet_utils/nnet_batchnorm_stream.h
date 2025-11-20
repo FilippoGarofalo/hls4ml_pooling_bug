@@ -30,6 +30,7 @@ BatchNormLoop:
         PRAGMA_DATA_PACK(out_data)
 
     BatchNormpack:
+        #pragma clang loop unroll(full)
         for (int j = 0; j < data_T::size; j++) {
             //#pragma HLS UNROLL
             int norm_index;
@@ -64,6 +65,7 @@ BinaryNormLoop:
         PRAGMA_DATA_PACK(out_data)
 
     BatchNormPack:
+        #pragma clang loop unroll(full)
         for (int j = 0; j < data_T::size; j++) {
             //#pragma HLS UNROLL
             int norm_index;
@@ -95,6 +97,7 @@ TernaryNormLoop:
         PRAGMA_DATA_PACK(out_data)
 
     BatchNormPack:
+        #pragma clang loop unroll(full)
         for (int j = 0; j < data_T::size; j++) {
             //#pragma HLS UNROLL
 

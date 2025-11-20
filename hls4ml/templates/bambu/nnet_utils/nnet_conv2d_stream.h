@@ -70,7 +70,7 @@ void conv_2d_cl(
     assert(CONFIG_T::implementation == conv_implementation::linebuffer &&
            "Only \"linebuffer\" implementation is supported in Vitis HLS.");
 
-    //#pragma HLS INLINE recursive
+    #pragma HLS INLINE recursive
     if (CONFIG_T::strategy == nnet::latency) {
         conv_2d_buffer_latency_cl<data_T, res_T, CONFIG_T>(data, res, weights, biases);
     } else {

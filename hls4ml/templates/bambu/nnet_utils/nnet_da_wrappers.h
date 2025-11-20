@@ -34,13 +34,14 @@ DataPrepare:
 ResWrite:
     for (unsigned i_out = 0; i_out < CONFIG_T::n_out / res_T::size; i_out++) {
         if (CONFIG_T::n_out / res_T::size > 1) {
-            #pragma HLS PIPELINE
+            //#pragma HLS PIPELINE
         }
         res_T res_pack;
         PRAGMA_DATA_PACK(res_pack)
     ResPack:
+        #pragma clang loop unroll(full)
         for (int i_pack = 0; i_pack < res_T::size; i_pack++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             res_pack[i_pack] = res[i_out * res_T::size + i_pack];
         }
         res_stream.write(res_pack);
@@ -55,7 +56,7 @@ conv1d_cl(data_T data[CONFIG_T::in_width * CONFIG_T::n_chan], res_T res[CONFIG_T
 
     data_T data_buf[CONFIG_T::n_pixels][mult_n_in];
     //#pragma HLS ARRAY_PARTITION variable = data_buf complete dim = 0
-    //#pragma HLS INLINE
+    #pragma HLS INLINE
 
     res_T out_buf[mult_n_out];
 
@@ -92,7 +93,7 @@ conv2d_cl(data_T data[CONFIG_T::in_height * CONFIG_T::in_width * CONFIG_T::n_cha
 
     data_T data_buf[CONFIG_T::n_pixels][mult_n_in];
     //#pragma HLS ARRAY_PARTITION variable=data_buf complete dim = 0
-    //#pragma HLS INLINE
+    #pragma HLS INLINE
 
     res_T out_buf[mult_n_out];
 

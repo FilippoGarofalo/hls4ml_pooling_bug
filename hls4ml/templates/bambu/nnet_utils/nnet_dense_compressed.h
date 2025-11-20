@@ -11,6 +11,7 @@ namespace nnet {
 template <typename CONFIG_T>
 void fill_mult(typename CONFIG_T::index_t index, typename CONFIG_T::accum_t mult[CONFIG_T::n_out],
                typename CONFIG_T::accum_t weight) {
+    #pragma clang loop unroll(full)
     for (unsigned k = 0; k < CONFIG_T::n_out; k++) {
         //#pragma HLS UNROLL
         if (k == index)
@@ -37,6 +38,7 @@ void dense_compressed(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_out],
 #endif
 
 InitAccum:
+    #pragma clang loop unroll(full)
     for (unsigned i = 0; i < CONFIG_T::n_out; i++) {
         //#pragma HLS UNROLL
         acc[i] = (typename CONFIG_T::accum_t)(biases[i]);
@@ -52,12 +54,14 @@ ReuseLoop:
         //#pragma HLS ARRAY_PARTITION variable=mult complete
 
     ResetMult:
+        #pragma clang loop unroll(full)
         for (int imult = 0; imult < CONFIG_T::n_out; imult++) {
             //#pragma HLS UNROLL
             mult[imult] = 0;
         }
 
     CompressedMultLoop:
+        #pragma clang loop unroll(full)
         for (unsigned im = 0; im < multiplier_limit; im++) {
             //#pragma HLS UNROLL
             unsigned w = im * rufactor + ir;
@@ -78,6 +82,7 @@ ReuseLoop:
 
 // Cast to "res_t" type
 ResultLoop:
+    #pragma clang loop unroll(full)
     for (unsigned i = 0; i < CONFIG_T::n_out; i++) {
         //#pragma HLS UNROLL
         // res[i] = (res_T) (acc[i]);

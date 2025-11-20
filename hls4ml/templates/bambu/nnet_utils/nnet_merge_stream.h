@@ -21,6 +21,7 @@ AddLoop:
         PRAGMA_DATA_PACK(out_data)
 
     AddPack:
+        #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
             //#pragma HLS UNROLL
             out_data[j] = in_data1[j] + in_data2[j];
@@ -44,6 +45,7 @@ SubtractLoop:
         PRAGMA_DATA_PACK(out_data)
 
     SubtractPack:
+        #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
             //#pragma HLS UNROLL
             out_data[j] = in_data1[j] - in_data2[j];
@@ -67,6 +69,7 @@ MultiplyLoop:
         PRAGMA_DATA_PACK(out_data)
 
     MultiplyPack:
+        #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
             //#pragma HLS UNROLL
             out_data[j] = in_data1[j] * in_data2[j];
@@ -90,6 +93,7 @@ AverageLoop:
         PRAGMA_DATA_PACK(out_data)
 
     AveragePack:
+        #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
             //#pragma HLS UNROLL
             out_data[j] = (in_data1[j] + in_data2[j]) / (typename res_T::value_type)2;
@@ -113,6 +117,7 @@ MaximumLoop:
         PRAGMA_DATA_PACK(out_data)
 
     MaximumPack:
+        #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
             //#pragma HLS UNROLL
             out_data[j] = (in_data1[j] > in_data2[j]) ? in_data1[j] : in_data2[j];
@@ -136,6 +141,7 @@ MinimumLoop:
         PRAGMA_DATA_PACK(out_data)
 
     MinimumPack:
+        #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
             //#pragma HLS UNROLL
             out_data[j] = (in_data1[j] < in_data2[j]) ? in_data1[j] : in_data2[j];
@@ -158,6 +164,7 @@ ConcatLoopHeight1:
             PRAGMA_DATA_PACK(out_data)
 
         ConcatPackInput1:
+            #pragma clang loop unroll(full)
             for (int k = 0; k < input1_T::size; k++) {
                 //#pragma HLS UNROLL
                 out_data[k] = in_data1[k];
@@ -177,6 +184,7 @@ ConcatLoopHeight2:
             PRAGMA_DATA_PACK(out_data)
 
         ConcatPackInput2:
+            #pragma clang loop unroll(full)
             for (int k = 0; k < input2_T::size; k++) {
                 //#pragma HLS UNROLL
                 out_data[k] = in_data2[k];
@@ -200,6 +208,7 @@ ConcatLoopHeight:
             PRAGMA_DATA_PACK(out_data)
 
         ConcatPackInput1:
+            #pragma clang loop unroll(full)
             for (int k = 0; k < input1_T::size; k++) {
                 //#pragma HLS UNROLL
                 out_data[k] = in_data1[k];
@@ -216,6 +225,7 @@ ConcatLoopHeight:
             PRAGMA_DATA_PACK(out_data)
 
         ConcatPackInput2:
+            #pragma clang loop unroll(full)
             for (int k = 0; k < input2_T::size; k++) {
                 //#pragma HLS UNROLL
                 out_data[k] = in_data2[k];
@@ -240,12 +250,14 @@ ConcatLoopHeight:
             PRAGMA_DATA_PACK(out_data)
 
         ConcatPackInput1:
+            #pragma clang loop unroll(full)
             for (int k = 0; k < input1_T::size; k++) {
                 //#pragma HLS UNROLL
                 out_data[k] = in_data1[k];
             }
 
         ConcatPackInput2:
+            #pragma clang loop unroll(full)
             for (int k = 0; k < input2_T::size; k++) {
                 //#pragma HLS UNROLL
                 out_data[input1_T::size + k] = in_data2[k];
@@ -278,6 +290,7 @@ ConcatLoopHeight1:
         PRAGMA_DATA_PACK(out_data)
 
     ConcatPackInput1:
+        #pragma clang loop unroll(full)
         for (int k = 0; k < input1_T::size; k++) {
             //#pragma HLS UNROLL
             out_data[k] = in_data1[k];
@@ -294,6 +307,7 @@ ConcatLoopHeight2:
         PRAGMA_DATA_PACK(out_data)
 
     ConcatPackInput2:
+        #pragma clang loop unroll(full)
         for (int k = 0; k < input2_T::size; k++) {
             //#pragma HLS UNROLL
             out_data[k] = in_data2[k];
@@ -315,12 +329,14 @@ ConcatLoopHeight:
         PRAGMA_DATA_PACK(out_data)
 
     ConcatPackInput1:
+        #pragma clang loop unroll(full)
         for (int k = 0; k < input1_T::size; k++) {
             //#pragma HLS UNROLL
             out_data[k] = in_data1[k];
         }
 
     ConcatPackInput2:
+        #pragma clang loop unroll(full)
         for (int k = 0; k < input2_T::size; k++) {
             //#pragma HLS UNROLL
             out_data[input1_T::size + k] = in_data2[k];
@@ -348,6 +364,7 @@ ConcatLoop1:
         //#pragma HLS PIPELINE
         input1_T in_data1 = data1.read();
     ConcatPack1:
+        #pragma clang loop unroll(full)
         for (int j = 0; j < input1_T::size; j++) {
             //#pragma HLS UNROLL
             out_data[j + (i * input1_T::size)] = in_data1[j];
@@ -358,6 +375,7 @@ ConcatLoop2:
         //#pragma HLS PIPELINE
         input2_T in_data2 = data2.read();
     ConcatPack2:
+        #pragma clang loop unroll(full)
         for (int j = 0; j < input2_T::size; j++) {
             //#pragma HLS UNROLL
             out_data[j + (i * input2_T::size) + (CONFIG_T::n_elem1_0)] = in_data2[j];
