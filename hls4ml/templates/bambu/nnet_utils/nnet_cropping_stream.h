@@ -48,7 +48,6 @@ void cropping2d_cl(hls::stream<data_T> &data, hls::stream<res_T> &res) {
         for (int j = 0; j < CONFIG_T::crop_left; j++) {
             data.read();
         }
-        
         #pragma clang loop unroll(full)
         for (int j = 0; j < CONFIG_T::out_width; j++) {
             fill_data<data_T, res_T, CONFIG_T>(data, res);

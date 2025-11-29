@@ -26,10 +26,27 @@ template <typename T, unsigned N> struct array {
 
         #pragma clang loop unroll(full)
         for (unsigned i = 0; i < N; i++) {
+            //#pragma HLS UNROLL
             data[i] = other[i];
         }
         return *this;
     }
+
+    bool operator==(const array &other) const {
+        if (N != other.size) {
+            return false;
+        }
+
+        for (unsigned i = 0; i < N; i++) {
+            if (data[i] != other[i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool operator!=(const array &other) const { return !(*this == other); }
 };
 
 // Generic lookup-table implementation, for use in approximations of math functions

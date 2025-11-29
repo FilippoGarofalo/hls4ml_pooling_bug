@@ -48,7 +48,7 @@ template <class data_T, class res_T, typename CONFIG_T>
 void layernorm_1d(data_T data[CONFIG_T::n_in / CONFIG_T::seq_len], res_T res[CONFIG_T::n_in / CONFIG_T::seq_len],
                   typename CONFIG_T::scale_t scale[CONFIG_T::n_in / CONFIG_T::seq_len],
                   typename CONFIG_T::bias_t bias[CONFIG_T::n_in / CONFIG_T::seq_len]) {
-    //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+    //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor /// to be checked again
     //#pragma HLS ARRAY_PARTITION variable=data complete
     //#pragma HLS ARRAY_PARTITION variable=res complete
     int inv_range_inv = (int)1 << CONFIG_T::table_range_power2;

@@ -69,7 +69,7 @@ void average(input1_T data1[CONFIG_T::n_elem], input2_T data2[CONFIG_T::n_elem],
 
     #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_elem; ii++) {
-        res[ii] = (data1[ii] + data2[ii]) / (res_T)2;
+        res[ii] = (data1[ii] + data2[ii]) * ap_ufixed<1, 0>(0.5);
     }
 }
 
@@ -79,7 +79,7 @@ void maximum(input1_T data1[CONFIG_T::n_elem], input2_T data2[CONFIG_T::n_elem],
 
     #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_elem; ii++) {
-        res[ii] = (data1[ii] > data2[ii]) ? data1[ii] : data2[ii];
+        res[ii] = (data1[ii] > data2[ii]) ? static_cast<res_T>(data1[ii]) : static_cast<res_T>(data2[ii]);
     }
 }
 
@@ -89,13 +89,13 @@ void minimum(input1_T data1[CONFIG_T::n_elem], input2_T data2[CONFIG_T::n_elem],
 
     #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_elem; ii++) {
-        res[ii] = (data1[ii] < data2[ii]) ? data1[ii] : data2[ii];
+        res[ii] = (data1[ii] < data2[ii]) ? static_cast<res_T>(data1[ii]) : static_cast<res_T>(data2[ii]);
     }
 }
 
 template <class input1_T, class input2_T, class res_T, typename CONFIG_T>
 void dot1d(input1_T data1[CONFIG_T::n_in], input2_T data2[CONFIG_T::n_in], res_T res[CONFIG_T::n_out]) {
-    //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+    //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor /// to be checked again
 
     //#pragma HLS ALLOCATION operation instances=mul limit=CONFIG_T::multiplier_limit
 
@@ -252,7 +252,7 @@ void concatenate3d_2(input1_T data1[CONFIG_T::n_elem1_0 * CONFIG_T::n_elem1_1 * 
                 res[res_idx] = data1[data_idx];
             }
             #pragma clang loop unroll(full)
-            for (int kk = 0; kk < CONFIG_T::n_elem1_2; kk++) {
+            for (int kk = 0; kk < CONFIG_T::n_elem2_2; kk++) {
                 int res_idx = ii * CONFIG_T::n_elem1_1 * (CONFIG_T::n_elem1_2 + CONFIG_T::n_elem2_2) +
                               jj * (CONFIG_T::n_elem1_2 + CONFIG_T::n_elem2_2) + kk + CONFIG_T::n_elem1_2;
                 int data_idx = ii * CONFIG_T::n_elem2_1 * CONFIG_T::n_elem2_2 + jj * CONFIG_T::n_elem2_2 + kk;

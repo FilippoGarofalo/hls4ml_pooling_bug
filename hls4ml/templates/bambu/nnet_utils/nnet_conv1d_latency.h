@@ -78,8 +78,8 @@ PartitionLoop:
         Result:
             #pragma clang loop unroll(full)
             for (int i_res = 0; i_res < mult_n_out; i_res++) {
-                res[i_part * CONFIG_T::n_pixels * mult_n_out + i_pxl * mult_n_out + i_res] =
-                    cast<data_T, res_T, typename CONFIG_T::mult_config>(acc[i_res]);
+                //#pragma HLS UNROLL
+                *(res++) = cast<data_T, res_T, typename CONFIG_T::mult_config>(acc[i_res]);
             }
         }
     }
@@ -117,6 +117,7 @@ ConvOut:
         ConvChan:
             #pragma clang loop unroll(full)
             for (int cc = 0; cc < CONFIG_T::n_chan; cc++) {
+                //#pragma HLS UNROLL
                 int index_mult = ii * CONFIG_T::n_filt * CONFIG_T::n_chan + ff * CONFIG_T::n_chan + cc;
                 int index_weight = cc * CONFIG_T::n_filt + ff;
                 int index_data = (ii * CONFIG_T::stride_width - CONFIG_T::pad_left) * CONFIG_T::n_chan + cc;
@@ -136,6 +137,7 @@ ConvOut:
     for (int ii = 0; ii < CONFIG_T::out_width / CONFIG_T::reuse_factor; ii++) {
         #pragma clang loop unroll(full)
         for (int ff = 0; ff < CONFIG_T::n_filt; ff++) {
+            //#pragma HLS UNROLL
             acc[ii][ff] = biases[ff];
         }
     }
@@ -158,6 +160,7 @@ AccumOut:
     for (int ii = 0; ii < CONFIG_T::out_width / CONFIG_T::reuse_factor; ii++) {
         #pragma clang loop unroll(full)
         for (int ff = 0; ff < CONFIG_T::n_filt; ff++) {
+            //#pragma HLS UNROLL
             res[ii * CONFIG_T::n_filt + ff] = cast<data_T, res_T, typename CONFIG_T::mult_config>(acc[ii][ff]);
         }
     }

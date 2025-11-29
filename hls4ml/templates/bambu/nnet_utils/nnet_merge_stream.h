@@ -61,7 +61,7 @@ void multiply(hls::stream<input1_T> &data1, hls::stream<input2_T> &data2, hls::s
 
 MultiplyLoop:
     for (int i = 0; i < CONFIG_T::n_elem / input1_T::size; i++) {
-        //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+        //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor /// to be checked again
 
         input1_T in_data1 = data1.read();
         input2_T in_data2 = data2.read();
@@ -85,7 +85,7 @@ void average(hls::stream<input1_T> &data1, hls::stream<input2_T> &data2, hls::st
 
 AverageLoop:
     for (int i = 0; i < CONFIG_T::n_elem / input1_T::size; i++) {
-        //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+        //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor /// to be checked again
 
         input1_T in_data1 = data1.read();
         input2_T in_data2 = data2.read();
@@ -96,7 +96,7 @@ AverageLoop:
         #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
             //#pragma HLS UNROLL
-            out_data[j] = (in_data1[j] + in_data2[j]) / (typename res_T::value_type)2;
+            out_data[j] = (in_data1[j] + in_data2[j]) * ap_ufixed<1, 0>(0.5);
         }
 
         res.write(out_data);
@@ -109,7 +109,7 @@ void maximum(hls::stream<input1_T> &data1, hls::stream<input2_T> &data2, hls::st
 
 MaximumLoop:
     for (int i = 0; i < CONFIG_T::n_elem / input1_T::size; i++) {
-        //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+        //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor /// to be checked again
 
         input1_T in_data1 = data1.read();
         input2_T in_data2 = data2.read();
@@ -120,7 +120,8 @@ MaximumLoop:
         #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
             //#pragma HLS UNROLL
-            out_data[j] = (in_data1[j] > in_data2[j]) ? in_data1[j] : in_data2[j];
+            out_data[j] = (in_data1[j] > in_data2[j]) ? static_cast<typename res_T::value_type>(in_data1[j])
+                                                      : static_cast<typename res_T::value_type>(in_data2[j]);
         }
 
         res.write(out_data);
@@ -133,7 +134,7 @@ void minimum(hls::stream<input1_T> &data1, hls::stream<input2_T> &data2, hls::st
 
 MinimumLoop:
     for (int i = 0; i < CONFIG_T::n_elem / input1_T::size; i++) {
-        //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+        //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor /// to be checked again
 
         input1_T in_data1 = data1.read();
         input2_T in_data2 = data2.read();
@@ -144,7 +145,8 @@ MinimumLoop:
         #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
             //#pragma HLS UNROLL
-            out_data[j] = (in_data1[j] < in_data2[j]) ? in_data1[j] : in_data2[j];
+            out_data[j] = (in_data1[j] < in_data2[j]) ? static_cast<typename res_T::value_type>(in_data1[j])
+                                                      : static_cast<typename res_T::value_type>(in_data2[j]);
         }
 
         res.write(out_data);

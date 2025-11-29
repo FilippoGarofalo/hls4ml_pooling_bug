@@ -55,7 +55,7 @@ void einsum_dense(
     constexpr unsigned C = CONFIG_T::n_contract;
     constexpr unsigned I = CONFIG_T::n_inplace;
 
-    #pragma clang loop unroll(full)
+    #pragma clang loop unroll_count(CONFIG_T::parallelization_factor)
     for (unsigned l0 = 0; l0 < L0; l0++) {
         //#pragma HLS UNROLL factor = CONFIG_T::parallelization_factor
         #pragma clang loop unroll(full)

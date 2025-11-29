@@ -64,8 +64,21 @@ ReLUActLoop:
 
 template <class data_T, class res_T, typename CONFIG_T> void sigmoid(hls::stream<data_T> &data, hls::stream<res_T> &res) {
     // Initialize the lookup table
+#ifdef OLD_SIGMOID
+#ifdef __HLS_SYN__
+    bool initialized = false;
+    typename CONFIG_T::table_t sigmoid_table[CONFIG_T::table_size];
+#else
+    static bool initialized = false;
+    static typename CONFIG_T::table_t sigmoid_table[CONFIG_T::table_size];
+#endif
+    if (!initialized) {
+        init_sigmoid_table<CONFIG_T, CONFIG_T::table_size>(sigmoid_table);
+        initialized = true;
+    }
+#else   
     static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> sigmoid_table = init_sigmoid_table<CONFIG_T, CONFIG_T::table_size>();
-
+#endif
 SigmoidActLoop:
     for (int i = 0; i < CONFIG_T::n_in / res_T::size; i++) {
         //#pragma HLS PIPELINE
@@ -97,16 +110,48 @@ SigmoidActLoop:
 template <class data_T, class res_T, typename CONFIG_T>
 void softmax_latency(hls::stream<data_T> &data, hls::stream<res_T> &res) {
     // Initialize the lookup tables
-    static constexpr const ::std::array<typename CONFIG_T::exp_table_t, CONFIG_T::table_size> exp_table = init_exp_table<data_T, CONFIG_T, CONFIG_T::table_size>();
-    static constexpr const ::std::array<typename CONFIG_T::inv_table_t, CONFIG_T::table_size> invert_table = init_inv_table<typename CONFIG_T::exp_table_t, CONFIG_T, CONFIG_T::table_size>();
+#ifdef OLD_EXP
+#ifdef __HLS_SYN__
+    bool initialized = false;
+    typename CONFIG_T::exp_table_t exp_table[CONFIG_T::exp_table_size];
+#else
+    static bool initialized = false;
+    static typename CONFIG_T::exp_table_t exp_table[CONFIG_T::exp_table_size];
 
+#endif
+    if (!initialized) {
+        // Note we are exponentiating the inputs, which have type data_T
+        init_exp_table<typename data_T::value_type, CONFIG_T>(exp_table);
+        initialized = true;
+    }
+#else
+    static constexpr const ::std::array<typename CONFIG_T::exp_table_t, CONFIG_T::exp_table_size> exp_table = init_exp_table<typename data_T::value_type, CONFIG_T, false>();
+#endif
+
+#ifdef OLD_INVERT
+#ifdef __HLS_SYN__
+    bool initializedinv = false;
+    typename CONFIG_T::inv_table_t invert_table[CONFIG_T::inv_table_size];
+#else
+    static bool initializedinv = false;
+    static typename CONFIG_T::inv_table_t invert_table[CONFIG_T::inv_table_size];
+
+#endif
+    if (!initializedinv) {
+        // Note we are inverting the exponentials, which have type exp_table_t
+        init_invert_table<typename CONFIG_T::inv_inp_t, CONFIG_T>(invert_table);
+        initializedinv = true;
+    }
+#else
+    static constexpr const ::std::array<typename CONFIG_T::inv_table_t, CONFIG_T::inv_table_size> invert_table = init_inv_table<typename CONFIG_T::inv_inp_t, CONFIG_T>();
+#endif
     constexpr unsigned multiplier_limit = DIV_ROUNDUP(data_T::size, CONFIG_T::reuse_factor);
     constexpr unsigned ii = data_T::size / multiplier_limit;
 
     // Calculate all the e^x's
-    typename CONFIG_T::exp_table_t exp_res[data_T::size];
+    typename CONFIG_T::accum_t exp_res[data_T::size];
     //#pragma HLS array_partition variable=exp_res complete
-    typename CONFIG_T::exp_table_t exp_sum(0);
+    typename CONFIG_T::inv_inp_t exp_sum(0);
 SoftmaxExpLoop:
     for (unsigned i = 0; i < CONFIG_T::n_in / data_T::size; i++) {
         //#pragma HLS PIPELINE II=ii
@@ -115,18 +160,17 @@ SoftmaxExpLoop:
     SoftmaxExpPackLoop:
         #pragma clang loop unroll(full)
         for (unsigned j = 0; j < data_T::size; j++) {
-            unsigned x = softmax_idx_from_real_val<typename data_T::value_type, CONFIG_T>(in_pack[j]);
+            unsigned x = softmax_idx_from_real_val<typename data_T::value_type, CONFIG_T::exp_table_size>(in_pack[j]);
             exp_res[j] = exp_table[x];
         }
 
         // Explicitly sum the results with an adder tree.
         // Rounding & Saturation mode, which improve accuracy, prevent Vivado from expression balancing
-        Op_add<typename CONFIG_T::exp_table_t> op_add;
-        exp_sum =
-            reduce<typename CONFIG_T::exp_table_t, data_T::size, Op_add<typename CONFIG_T::exp_table_t>>(exp_res, op_add);
+        Op_add<typename CONFIG_T::accum_t> op_add;
+        exp_sum = reduce<typename CONFIG_T::accum_t, data_T::size, Op_add<typename CONFIG_T::accum_t>>(exp_res, op_add);
 
         typename CONFIG_T::inv_table_t inv_exp_sum =
-            invert_table[softmax_idx_from_real_val<typename CONFIG_T::exp_table_t, CONFIG_T>(exp_sum)];
+            invert_table[softmax_idx_from_real_val<typename CONFIG_T::inv_inp_t, CONFIG_T::inv_table_size>(exp_sum)];
 
         res_T out_pack;
         PRAGMA_DATA_PACK(out_pack)
@@ -134,6 +178,7 @@ SoftmaxExpLoop:
     SoftmaxInvPackLoop:
         #pragma clang loop unroll(full)
         for (unsigned j = 0; j < res_T::size; j++) {
+            //#pragma HLS UNROLL
             //#pragma HLS ALLOCATION operation instances=mul limit=multiplier_limit
             out_pack[j] = exp_res[j] * inv_exp_sum;
         }
@@ -144,8 +189,40 @@ SoftmaxExpLoop:
 template <class data_T, class res_T, typename CONFIG_T>
 void softmax_stable(hls::stream<data_T> &data, hls::stream<res_T> &res) {
     // Initialize the lookup tables
-    static constexpr const ::std::array<typename CONFIG_T::exp_table_t, CONFIG_T::table_size> exp_table = init_exp_table<data_T, CONFIG_T, CONFIG_T::table_size>();
-    static constexpr const ::std::array<typename CONFIG_T::inv_table_t, CONFIG_T::table_size> invert_table = init_inv_table<typename CONFIG_T::exp_table_t, CONFIG_T, CONFIG_T::table_size>();
+#ifdef OLD_EXP
+    #ifdef __HLS_SYN__
+    bool initialized = false;
+    typename CONFIG_T::exp_table_t exp_table[CONFIG_T::exp_table_size];
+#else
+    static bool initialized = false;
+    static typename CONFIG_T::exp_table_t exp_table[CONFIG_T::exp_table_size];
+
+#endif
+    if (!initialized) {
+        // Note we are exponentiating the inputs, which have type data_T
+        init_exp_table<typename CONFIG_T::inp_norm_t, CONFIG_T>(exp_table, true);
+        initialized = true;
+    }
+#else
+    static constexpr const ::std::array<typename CONFIG_T::exp_table_t, CONFIG_T::exp_table_size> exp_table = init_exp_table<typename CONFIG_T::inp_norm_t, CONFIG_T, true>();
+#endif
+#ifdef OLD_INVERT
+    #ifdef __HLS_SYN__
+    bool initializedinv = false;
+    typename CONFIG_T::inv_table_t invert_table[CONFIG_T::inv_table_size];
+#else
+    static bool initializedinv = false;
+    static typename CONFIG_T::inv_table_t invert_table[CONFIG_T::inv_table_size];
+
+#endif
+    if (!initializedinv) {
+        // Note we are inverting the exponentials, which have type exp_table_t
+        init_invert_table<typename CONFIG_T::inv_inp_t, CONFIG_T>(invert_table);
+        initializedinv = true;
+    }
+#else
+    static constexpr const ::std::array<typename CONFIG_T::inv_table_t, CONFIG_T::inv_table_size> invert_table = init_inv_table<typename CONFIG_T::inv_inp_t, CONFIG_T>();
+#endif
 
     constexpr unsigned multiplier_limit = DIV_ROUNDUP(data_T::size, CONFIG_T::reuse_factor);
     constexpr unsigned ii = data_T::size / multiplier_limit;
@@ -168,31 +245,29 @@ SoftmaxArrayLoop:
         typename data_T::value_type x_max =
             reduce<typename data_T::value_type, data_T::size, Op_max<typename data_T::value_type>>(data_array, op_max);
 
-        // For the diffs, use the same type as the input but force rounding and saturation
-        ap_fixed<data_T::value_type::width, data_T::value_type::iwidth, AP_RND, AP_SAT> d_xi_xmax[data_T::size];
+        typename CONFIG_T::inp_norm_t d_xi_xmax[data_T::size];
         #pragma clang loop unroll(full)
         for (unsigned j = 0; j < data_T::size; j++) {
-            d_xi_xmax[j] = data_array[j] - x_max;
+            d_xi_xmax[j] = x_max - data_array[j];
         }
 
         // Calculate all the e^x's
-        typename CONFIG_T::exp_table_t exp_res[data_T::size];
+        typename CONFIG_T::accum_t exp_res[data_T::size];
         //#pragma HLS ARRAY_PARTITION variable=exp_res complete
-        typename CONFIG_T::exp_table_t exp_sum(0);
+        typename CONFIG_T::inv_inp_t exp_sum(0);
         #pragma clang loop unroll(full)
         for (unsigned j = 0; j < data_T::size; j++) {
-            unsigned x = softmax_idx_from_real_val<typename data_T::value_type, CONFIG_T>(d_xi_xmax[j]);
+            unsigned x = softmax_idx_from_real_val<typename CONFIG_T::inp_norm_t, CONFIG_T::exp_table_size>(d_xi_xmax[j]);
             exp_res[j] = exp_table[x];
         }
 
         // Explicitly sum the results with an adder tree.
         // Rounding & Saturation mode, which improve accuracy, prevent Vivado from expression balancing
-        Op_add<typename CONFIG_T::exp_table_t> op_add;
-        exp_sum =
-            reduce<typename CONFIG_T::exp_table_t, data_T::size, Op_add<typename CONFIG_T::exp_table_t>>(exp_res, op_add);
+        Op_add<typename CONFIG_T::accum_t> op_add;
+        exp_sum = reduce<typename CONFIG_T::accum_t, data_T::size, Op_add<typename CONFIG_T::accum_t>>(exp_res, op_add);
 
         typename CONFIG_T::inv_table_t inv_exp_sum =
-            invert_table[softmax_idx_from_real_val<typename CONFIG_T::exp_table_t, CONFIG_T>(exp_sum)];
+            invert_table[softmax_idx_from_real_val<typename CONFIG_T::inv_inp_t, CONFIG_T::inv_table_size>(exp_sum)];
 
         res_T out_pack;
         PRAGMA_DATA_PACK(out_pack)
@@ -200,6 +275,7 @@ SoftmaxArrayLoop:
     SoftmaxInvPackLoop:
         #pragma clang loop unroll(full)
         for (unsigned j = 0; j < res_T::size; j++) {
+            //#pragma HLS UNROLL
             //#pragma HLS ALLOCATION operation instances=mul limit=multiplier_limit
             out_pack[j] = exp_res[j] * inv_exp_sum;
         }
@@ -210,8 +286,20 @@ SoftmaxArrayLoop:
 template <class data_T, class res_T, typename CONFIG_T>
 void softmax_legacy(hls::stream<data_T> &data, hls::stream<res_T> &res) {
     // Initialize the lookup table
-    static constexpr const ::std::array<typename CONFIG_T::exp_table_t, CONFIG_T::table_size> exp_table = init_exp_table<data_T, CONFIG_T, CONFIG_T::table_size>();
-    static constexpr const ::std::array<typename CONFIG_T::inv_table_t, CONFIG_T::table_size> invert_table = init_inv_table<typename CONFIG_T::exp_table_t, CONFIG_T, CONFIG_T::table_size>();
+#ifdef __HLS_SYN__
+    bool initialized = false;
+    typename CONFIG_T::table_t exp_table[CONFIG_T::table_size];
+    typename CONFIG_T::table_t invert_table[CONFIG_T::table_size];
+#else
+    static bool initialized = false;
+    static typename CONFIG_T::table_t exp_table[CONFIG_T::table_size];
+    static typename CONFIG_T::table_t invert_table[CONFIG_T::table_size];
+#endif
+    if (!initialized) {
+        init_exp_table_legacy<CONFIG_T, CONFIG_T::table_size>(exp_table);
+        init_invert_table_legacy<CONFIG_T, CONFIG_T::table_size>(invert_table);
+        initialized = true;
+    }
 
     // Index into the lookup table based on data for exponentials
     typename CONFIG_T::table_t exp_res[data_T::size];
@@ -225,6 +313,7 @@ SoftmaxInitLoop:
     SoftmaxInitPackLoop:
         #pragma clang loop unroll(full)
         for (unsigned j = 0; j < data_T::size; j++) {
+            //#pragma HLS UNROLL
             data_cache[j] = in_pack[j];
             exp_res[j] = 0;
         }
@@ -232,9 +321,11 @@ SoftmaxInitLoop:
     SoftmaxExpLoop:
         #pragma clang loop unroll(full)
         for (int i = 0; i < data_T::size; i++) {
+        //#pragma HLS UNROLL
         SoftmaxExpInner:
             #pragma clang loop unroll(full)
             for (int j = 0; j < data_T::size; j++) {
+                //#pragma HLS UNROLL
 
                 if (i == j) {
                     exp_diff_res = 1;
@@ -258,6 +349,7 @@ SoftmaxInitLoop:
     SoftmaxInvPackLoop:
         #pragma clang loop unroll(full)
         for (unsigned j = 0; j < res_T::size; j++) {
+            //#pragma HLS UNROLL
 
             int exp_res_index = exp_res[j] * CONFIG_T::table_size / 64;
             if (exp_res_index < 0)
@@ -280,6 +372,7 @@ void softmax_argmax(hls::stream<data_T> &data, hls::stream<res_T> &res) {
 
         #pragma clang loop unroll(full)
         for (int i = 0; i < res_T::size; i++) {
+            //#pragma HLS UNROLL
             out_data[i] = (typename res_T::value_type)0;
         }
 
@@ -347,6 +440,7 @@ TanHActLoop:
     TanHPackLoop:
         #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
+            //#pragma HLS UNROLL
             int data_round = in_data[j] * CONFIG_T::table_size / 8;
             int index = data_round + 4 * CONFIG_T::table_size / 8;
             if (index < 0)
@@ -380,6 +474,7 @@ UnaryLUTActLoop:
     UnaryLUTPackLoop:
         #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
+            //#pragma HLS UNROLL
             unsigned index = get_index_unary_lut<CONFIG_T::table_size>(in_data[j].V);
             out_data[j] = table[index];
         }
@@ -406,6 +501,7 @@ HardSigmoidActLoop:
     HardSigmoidPackLoop:
         #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
+            //#pragma HLS UNROLL
             auto datareg = CONFIG_T::slope * in_data[j] + CONFIG_T::shift;
             if (datareg > 1)
                 datareg = 1;
@@ -431,6 +527,7 @@ HardSigmoidActLoop:
     HardSigmoidPackLoop:
         #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
+            //#pragma HLS UNROLL
             auto sigmoid = CONFIG_T::slope * in_data[j] + CONFIG_T::shift;
             if (sigmoid > 1)
                 sigmoid = 1;
@@ -460,6 +557,7 @@ LeakyReLUActLoop:
     LeakyReLUPackLoop:
         #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
+            //#pragma HLS UNROLL
             if (in_data[j] > 0)
                 out_data[j] = in_data[j];
             else
@@ -486,6 +584,7 @@ ThresholdedReLUActLoop:
     ThresholdedReLUPackLoop:
         #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
+            //#pragma HLS UNROLL
             if (in_data[j] > theta)
                 out_data[j] = in_data[j];
             else
@@ -525,6 +624,7 @@ SoftplusActLoop:
     SoftplusPackLoop:
         #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
+            //#pragma HLS UNROLL
             int data_round = in_data[j] * CONFIG_T::table_size / 16;
             int index = data_round + 8 * CONFIG_T::table_size / 16;
             if (index < 0)
@@ -566,6 +666,7 @@ SoftsignActLoop:
     SoftsignPackLoop:
         #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
+            //#pragma HLS UNROLL
             int data_round = in_data[j] * CONFIG_T::table_size / 16;
             int index = data_round + 8 * CONFIG_T::table_size / 16;
             if (index < 0)
@@ -607,6 +708,7 @@ EluActLoop:
     EluPackLoop:
         #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
+            //#pragma HLS UNROLL
 
             typename data_T::value_type datareg = in_data[j];
             if (datareg >= 0) {
@@ -655,6 +757,7 @@ SeluActLoop:
     SeluPackLoop:
         #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
+            //#pragma HLS UNROLL
 
             typename data_T::value_type datareg = in_data[j];
             if (datareg >= 0) {
@@ -687,6 +790,7 @@ PReLUActLoop:
     PReLUPackLoop:
         #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
+            //#pragma HLS UNROLL
             if (in_data[j] > 0)
                 out_data[j] = in_data[j];
             else
@@ -701,21 +805,26 @@ PReLUActLoop:
 // *************************************************
 template <class data_T, class res_T, typename CONFIG_T>
 void binary_tanh(hls::stream<data_T> &data, hls::stream<res_T> &res) {
+    using cache_T = ap_int<2>;
 PReLUActLoop:
     for (int i = 0; i < CONFIG_T::n_in / res_T::size; i++) {
         //#pragma HLS PIPELINE
 
         data_T in_data = data.read();
+        cache_T cache;
         res_T out_data;
         PRAGMA_DATA_PACK(out_data)
 
     PReLUPackLoop:
         #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
-            if (in_data[j] > 0)
-                out_data[j] = (typename res_T::value_type)1;
+            //#pragma HLS UNROLL
+            if (in_data[j] >= 0)
+                cache = 1;
             else
-                out_data[j] = (typename res_T::value_type) - 1;
+                cache = -1;
+
+            out_data[j] = binary_cast<cache_T, typename res_T::value_type>(cache);
         }
         res.write(out_data);
     }
@@ -737,6 +846,7 @@ PReLUActLoop:
     PReLUPackLoop:
         #pragma clang loop unroll(full)
         for (int j = 0; j < res_T::size; j++) {
+            //#pragma HLS UNROLL
             if (in_data[j] > 1)
                 out_data[j] = (typename res_T::value_type)1;
             else if (in_data[j] <= -1)
