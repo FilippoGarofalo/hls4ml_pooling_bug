@@ -165,7 +165,7 @@ class BambuWriter(Writer):
             elif '// hls-fpga-machine-learning insert load weights' in line:
                 newline = line
                 if model.config.get_writer_config()['WriteWeightsTxt']:
-                    newline += '#ifndef __SYNTHESIS__\n'
+                    newline += '#ifndef __BAMBU__\n'
                     newline += '    static bool loaded_weights = false;\n'
                     newline += '    if (!loaded_weights) {\n'
 

@@ -13,7 +13,7 @@
 
 namespace nnet {
 
-#ifndef __SYNTHESIS__
+#ifndef __BAMBU__
 
 #ifndef WEIGHTS_DIR
 #define WEIGHTS_DIR "weights"

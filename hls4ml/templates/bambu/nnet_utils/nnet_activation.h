@@ -3,7 +3,10 @@
 
 #include "ap_fixed.h"
 #include "nnet_common.h"
+#include <array>
 #include <cmath>
+#include <limits>
+#include "gcem/include/gcem.hpp"
 
 namespace nnet {
 
@@ -26,8 +29,9 @@ struct activ_config {
 //       LINEAR Activation -- See Issue 53
 // *************************************************
 template <class data_T, class res_T, typename CONFIG_T> void linear(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
         res[ii] = data[ii];
     }
@@ -37,9 +41,10 @@ template <class data_T, class res_T, typename CONFIG_T> void linear(data_T data[
 //       RELU Activation
 // *************************************************
 template <class data_T, class res_T, typename CONFIG_T> void relu(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
     data_T datareg;
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
         datareg = data[ii];
         if (datareg > 0)
@@ -51,9 +56,10 @@ template <class data_T, class res_T, typename CONFIG_T> void relu(data_T data[CO
 
 template <class data_T, class res_T, int MAX_INT, typename CONFIG_T>
 void relu_max(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
     data_T datareg;
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
         datareg = data[ii];
         if (datareg < 0)
@@ -76,8 +82,12 @@ template <class data_T, class res_T, typename CONFIG_T> void relu1(data_T data[C
 // *************************************************
 //       Sigmoid Activation
 // *************************************************
-inline float sigmoid_fcn_float(float input) { return 1.0 / (1 + std::exp(-input)); }
-
+constexpr inline float sigmoid_fcn_float(float input)
+{
+ using gcem::exp;
+ return 1.0 / (1 + exp(-input));
+}
+#ifdef OLD_SIGMOID
 template <typename CONFIG_T, int N_TABLE> void init_sigmoid_table(typename CONFIG_T::table_t table_out[N_TABLE]) {
     // Default logistic sigmoid function:
     //   result = 1/(1+e^(-x))
@@ -90,10 +100,34 @@ template <typename CONFIG_T, int N_TABLE> void init_sigmoid_table(typename CONFI
         table_out[ii] = real_val;
     }
 }
+#else
+template <typename CONFIG_T, std::size_t N_TABLE>
+constexpr typename CONFIG_T::table_t compute_sigmoid_fcn_float_index(size_t ii)
+{
+  // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
+  float in_val = 2 * 8.0 * (ii - float(N_TABLE) / 2.0) / float(N_TABLE);
+  // Next, compute lookup table function
+  typename CONFIG_T::table_t real_val = sigmoid_fcn_float(in_val);
+  return real_val;
+}
+
+template <typename CONFIG_T, std::size_t N, std::size_t... I>
+constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_sigmoid_table(std::index_sequence<I...>)
+{
+  return std::array<typename CONFIG_T::table_t, sizeof...(I)>{compute_sigmoid_fcn_float_index<CONFIG_T, N>(I)...};
+}
+
+template <typename CONFIG_T, std::size_t N>
+constexpr static std::array<typename CONFIG_T::table_t, N> init_sigmoid_table()
+{
+  return init_sigmoid_table<CONFIG_T, N>(std::make_index_sequence<N>{});
+}
+#endif
 
 template <class data_T, class res_T, typename CONFIG_T>
 void sigmoid(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
     // Initialize the lookup table
+#ifdef OLD_SIGMOID
 #ifdef __HLS_SYN__
     bool initialized = false;
     typename CONFIG_T::table_t sigmoid_table[CONFIG_T::table_size];
@@ -105,12 +139,15 @@ void sigmoid(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
         init_sigmoid_table<CONFIG_T, CONFIG_T::table_size>(sigmoid_table);
         initialized = true;
     }
-
-    #pragma HLS PIPELINE
+#else
+    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> sigmoid_table = init_sigmoid_table<CONFIG_T, CONFIG_T::table_size>();
+#endif
+    //#pragma HLS PIPELINE
 
     // Index into the lookup table based on data
     int data_round;
     int index;
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
         data_round = data[ii] * CONFIG_T::table_size / 16;
         index = data_round + 8 * CONFIG_T::table_size / 16;
@@ -128,23 +165,31 @@ void sigmoid(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
 
 enum class softmax_implementation { latency = 0, legacy = 1, stable = 2, argmax = 3 };
 
-inline float exp_fcn_float(float input) { return std::exp(input); }
+constexpr inline float exp_fcn_float(float input) 
+{
+ using gcem::exp;
+ return exp(input); 
+}
 
-template <class data_T, unsigned table_size> inline float softmax_real_val_from_idx(unsigned i) {
+template <class data_T, unsigned table_size> 
+constexpr inline float softmax_real_val_from_idx(unsigned i) {
     // Treat the index as the top N bits
-    static constexpr int N = ceillog2(table_size); // number of address bits for table
+    constexpr int N = ceillog2(table_size); // number of address bits for table
     data_T x(0);
     x(x.width - 1, x.width - N) = i;
     return (float)x;
 }
 
-template <class data_T, unsigned table_size> inline unsigned softmax_idx_from_real_val(data_T x) {
+template <class data_T, unsigned table_size> 
+constexpr inline unsigned softmax_idx_from_real_val(data_T x) {
     // Slice the top N bits to get an index into the table
-    static constexpr int N = ceillog2(table_size); // number of address bits for table
-    ap_uint<N> y = x(x.width - 1, x.width - N);    // slice the top N bits of input
+    constexpr int N = ceillog2(table_size); // number of address bits for table
+    ap_uint<N> y = x(x.width - 1, x.width - N);              // slice the top N bits of input
     return (unsigned)y(N - 1, 0);
 }
 
+
+#ifdef OLD_EXP
 template <class data_T, typename CONFIG_T>
 void init_exp_table(typename CONFIG_T::exp_table_t table_out[CONFIG_T::exp_table_size], bool negative = false) {
     // The template data_T is the data type used to address the table
@@ -160,7 +205,35 @@ void init_exp_table(typename CONFIG_T::exp_table_t table_out[CONFIG_T::exp_table
         table_out[i] = exp_x;
     }
 }
+#else
+template <class data_T, typename CONFIG_T, bool negative>
+constexpr typename CONFIG_T::exp_table_t compute_exp_index(size_t i)
+{
+  float x = softmax_real_val_from_idx<data_T, CONFIG_T::exp_table_size>(i) * CONFIG_T::exp_scale;
+  typename CONFIG_T::exp_table_t exp_x = exp_fcn_float(x);
+  if (negative) {
+            // for normalized inputs, we keep the normalization values positive (x_bar = x_max - x)
+            // so we need to negate the input (exp(-x_bar) = exp(x - x_max))
+            x = -x;
+  }
+  return exp_x;
+}
 
+template <class data_T, bool negative, typename CONFIG_T, std::size_t... I>
+constexpr static std::array<typename CONFIG_T::exp_table_t, sizeof...(I)> init_exp_table(std::index_sequence<I...>)
+{
+  return std::array<typename CONFIG_T::exp_table_t, sizeof...(I)>{compute_exp_index<data_T, CONFIG_T, negative>(I)...};
+}
+
+template <class data_T, typename CONFIG_T, bool negative>
+constexpr static std::array<typename CONFIG_T::exp_table_t, CONFIG_T::exp_table_size> init_exp_table()
+{
+  return init_exp_table<data_T, negative, CONFIG_T>(std::make_index_sequence<CONFIG_T::exp_table_size>{});
+}
+
+#endif
+
+#ifdef OLD_INVERT
 template <class data_T, typename CONFIG_T>
 void init_invert_table(typename CONFIG_T::inv_table_t table_out[CONFIG_T::inv_table_size]) {
     // The template data_T is the data type used to address the table
@@ -170,35 +243,74 @@ void init_invert_table(typename CONFIG_T::inv_table_t table_out[CONFIG_T::inv_ta
         table_out[i] = inv_x;
     }
 }
+#else
+template <class data_T, typename CONFIG_T>
+constexpr typename CONFIG_T::inv_table_t compute_inv_index(size_t i)
+{
+  float x = softmax_real_val_from_idx<data_T, CONFIG_T::inv_table_size>(i);
+  float safe_x = (x == 0.0f) ? std::numeric_limits<float>::min() : x;
+  typename CONFIG_T::inv_table_t inv_x = 1 / safe_x;
+  return inv_x;
+}
+
+template <class data_T, typename CONFIG_T, std::size_t... I>
+constexpr static std::array<typename CONFIG_T::inv_table_t, sizeof...(I)> init_inv_table(std::index_sequence<I...>)
+{
+  return std::array<typename CONFIG_T::inv_table_t, sizeof...(I)>{compute_inv_index<data_T, CONFIG_T>(I)...};
+}
+
+template <class data_T, typename CONFIG_T>
+constexpr static std::array<typename CONFIG_T::inv_table_t, CONFIG_T::inv_table_size> init_inv_table()
+{
+  return init_inv_table<data_T, CONFIG_T>(std::make_index_sequence<CONFIG_T::inv_table_size>{});
+}
+
+#endif
 
 template <class data_T, class res_T, typename CONFIG_T>
 void softmax_latency(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice]) {
-    #pragma HLS pipeline
+    //#pragma HLS pipeline
     // Initialize the lookup tables
+#ifdef OLD_EXP
 #ifdef __HLS_SYN__
     bool initialized = false;
     typename CONFIG_T::exp_table_t exp_table[CONFIG_T::exp_table_size];
-    typename CONFIG_T::inv_table_t invert_table[CONFIG_T::inv_table_size];
 #else
     static bool initialized = false;
     static typename CONFIG_T::exp_table_t exp_table[CONFIG_T::exp_table_size];
-    static typename CONFIG_T::inv_table_t invert_table[CONFIG_T::inv_table_size];
 
 #endif
     if (!initialized) {
         // Note we are exponentiating the inputs, which have type data_T
         init_exp_table<data_T, CONFIG_T>(exp_table);
-        // Note we are inverting the exponentials, which have type exp_table_t
-        init_invert_table<typename CONFIG_T::inv_inp_t, CONFIG_T>(invert_table);
         initialized = true;
     }
+#else
+    static constexpr const ::std::array<typename CONFIG_T::exp_table_t, CONFIG_T::table_size> exp_table = init_exp_table<data_T, CONFIG_T, false>();
+#endif
+#ifdef OLD_INVERT
+#ifdef __HLS_SYN__
+    bool initializedinv = false;
+    typename CONFIG_T::inv_table_t invert_table[CONFIG_T::inv_table_size];
+#else
+    static bool initializedinv = false;
+    static typename CONFIG_T::inv_table_t invert_table[CONFIG_T::inv_table_size];
 
+#endif
+    if (!initializedinv) {
+        // Note we are inverting the exponentials, which have type exp_table_t
+        init_invert_table<typename CONFIG_T::inv_table_t, CONFIG_T>(invert_table);
+        initializedinv = true;
+    }
+#else
+    static constexpr const ::std::array<typename CONFIG_T::inv_table_t, CONFIG_T::inv_table_size> invert_table = init_inv_table<typename CONFIG_T::inv_table_t, CONFIG_T>();
+#endif
     // Calculate all the e^x's
     typename CONFIG_T::accum_t exp_res[CONFIG_T::n_slice];
-    #pragma HLS array_partition variable=exp_res complete
+    //#pragma HLS array_partition variable=exp_res complete
     typename CONFIG_T::inv_inp_t exp_sum(0);
+    #pragma clang loop unroll(full)
     for (unsigned i = 0; i < CONFIG_T::n_slice; i++) {
-        #pragma HLS unroll
         unsigned x = softmax_idx_from_real_val<data_T, CONFIG_T::exp_table_size>(data[i]);
         exp_res[i] = exp_table[x];
     }
@@ -210,50 +322,67 @@ void softmax_latency(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice
 
     typename CONFIG_T::inv_table_t inv_exp_sum =
         invert_table[softmax_idx_from_real_val<typename CONFIG_T::inv_inp_t, CONFIG_T::inv_table_size>(exp_sum)];
+    #pragma clang loop unroll(full)
     for (unsigned i = 0; i < CONFIG_T::n_slice; i++) {
-        #pragma HLS unroll
         res[i] = exp_res[i] * inv_exp_sum;
     }
 }
 
 template <class data_T, class res_T, typename CONFIG_T>
 void softmax_stable(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice]) {
-    #pragma HLS pipeline
+    //#pragma HLS pipeline
     // Initialize the lookup tables
+#ifdef OLD_EXP
 #ifdef __HLS_SYN__
     bool initialized = false;
     typename CONFIG_T::exp_table_t exp_table[CONFIG_T::exp_table_size];
-    typename CONFIG_T::inv_table_t invert_table[CONFIG_T::inv_table_size];
 #else
     static bool initialized = false;
     static typename CONFIG_T::exp_table_t exp_table[CONFIG_T::exp_table_size];
-    static typename CONFIG_T::inv_table_t invert_table[CONFIG_T::inv_table_size];
 
 #endif
     if (!initialized) {
         // Note we are exponentiating the inputs, which have type data_T
         init_exp_table<typename CONFIG_T::inp_norm_t, CONFIG_T>(exp_table, true);
-        // Note we are inverting the exponentials, which have type exp_table_t
-        init_invert_table<typename CONFIG_T::inv_inp_t, CONFIG_T>(invert_table);
         initialized = true;
     }
+#else
+    static constexpr const ::std::array<typename CONFIG_T::exp_table_t, CONFIG_T::exp_table_size> exp_table = init_exp_table<typename CONFIG_T::inp_norm_t, CONFIG_T, true>();
+#endif
+#ifdef OLD_INVERT
+#ifdef __HLS_SYN__
+    bool initializedinv = false;
+    typename CONFIG_T::inv_table_t invert_table[CONFIG_T::inv_table_size];
+#else
+    static bool initializedinv = false;
+    static typename CONFIG_T::inv_table_t invert_table[CONFIG_T::inv_table_size];
+
+#endif
+    if (!initializedinv) {
+        // Note we are inverting the exponentials, which have type exp_table_t
+        init_invert_table<typename CONFIG_T::inv_inp_t, CONFIG_T>(invert_table);
+        initializedinv = true;
+    }
+#else
+    static constexpr const ::std::array<typename CONFIG_T::inv_table_t, CONFIG_T::inv_table_size> invert_table = init_inv_table<typename CONFIG_T::inv_inp_t, CONFIG_T>();
+#endif
 
     // Find the max and compute all delta(x_i, x_max)
     Op_max<data_T> op_max;
     data_T x_max = reduce<data_T, CONFIG_T::n_slice, Op_max<data_T>>(data, op_max);
 
     typename CONFIG_T::inp_norm_t d_xi_xmax[CONFIG_T::n_slice];
+    #pragma clang loop unroll(full)
     for (unsigned i = 0; i < CONFIG_T::n_slice; i++) {
-        #pragma HLS unroll
         d_xi_xmax[i] = x_max - data[i];
     }
 
     // Calculate all the e^x's
     typename CONFIG_T::accum_t exp_res[CONFIG_T::n_slice];
-    #pragma HLS array_partition variable=exp_res complete
+    //#pragma HLS array_partition variable=exp_res complete
     typename CONFIG_T::inv_inp_t exp_sum(0);
+    #pragma clang loop unroll(full)
     for (unsigned i = 0; i < CONFIG_T::n_slice; i++) {
-        #pragma HLS unroll
         unsigned x = softmax_idx_from_real_val<typename CONFIG_T::inp_norm_t, CONFIG_T::exp_table_size>(d_xi_xmax[i]);
         exp_res[i] = exp_table[x];
     }
@@ -265,8 +394,8 @@ void softmax_stable(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice]
 
     typename CONFIG_T::inv_table_t inv_exp_sum =
         invert_table[softmax_idx_from_real_val<typename CONFIG_T::inv_inp_t, CONFIG_T::inv_table_size>(exp_sum)];
+    #pragma clang loop unroll(full)
     for (unsigned i = 0; i < CONFIG_T::n_slice; i++) {
-        #pragma HLS unroll
         res[i] = exp_res[i] * inv_exp_sum;
     }
 }
@@ -314,7 +443,7 @@ void softmax_legacy(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice]
         initialized = true;
     }
 
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
     // Index into the lookup table based on data for exponentials
     typename CONFIG_T::table_t exp_res[CONFIG_T::n_slice]; // different, independent, fixed point precision
@@ -322,12 +451,15 @@ void softmax_legacy(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice]
     data_T data_cache[CONFIG_T::n_slice];
     int data_round;
     int index;
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_slice; ii++) {
         data_cache[ii] = data[ii];
         exp_res[ii] = 0;
     }
 
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_slice; ii++) {
+        #pragma clang loop unroll(full)
         for (int jj = 0; jj < CONFIG_T::n_slice; jj++) {
             if (ii == jj)
                 exp_diff_res = 1;
@@ -345,6 +477,7 @@ void softmax_legacy(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice]
     }
 
     // Second loop to invert
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_slice; ii++) {
         int exp_res_index = exp_res[ii] * CONFIG_T::inv_table_size / 64;
         if (exp_res_index < 0)
@@ -358,8 +491,8 @@ void softmax_legacy(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice]
 
 template <class data_T, class res_T, typename CONFIG_T>
 void softmax_argmax(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice]) {
+    #pragma clang loop unroll(full)
     for (int i = 0; i < CONFIG_T::n_slice; i++) {
-        #pragma HLS UNROLL
         res[i] = (res_T)0;
     }
 
@@ -367,7 +500,7 @@ void softmax_argmax(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice]
     int idx = 0;
 
     for (int i = 1; i < CONFIG_T::n_slice; i++) {
-        #pragma HLS PIPELINE
+        //#pragma HLS PIPELINE
         if (data[i] > maximum) {
             maximum = data[i];
             idx = i;
@@ -399,20 +532,24 @@ void softmax(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice]) {
 template <class data_T, class res_T, typename CONFIG_T>
 void softmax_multidim(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
     #pragma HLS inline
-    #pragma HLS allocation instances = softmax<CONFIG_T> limit = CONFIG_T::parallelization_factor function
+    //#pragma HLS allocation instances = softmax<CONFIG_T> limit = CONFIG_T::parallelization_factor function
     data_T buffer_in[CONFIG_T::n_slice];
     res_T buffer_out[CONFIG_T::n_slice];
+    #pragma clang loop unroll(full)
     for (signed i = 0; i < CONFIG_T::n_outer; i++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
+        #pragma clang loop unroll(full)
         for (signed k = 0; k < CONFIG_T::n_inner; k++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
+            #pragma clang loop unroll(full)
             for (signed j = 0; j < CONFIG_T::n_slice; j++) {
-                #pragma HLS UNROLL
+                //#pragma HLS UNROLL
                 buffer_in[j] = data[i * CONFIG_T::n_slice * CONFIG_T::n_inner + j * CONFIG_T::n_inner + k];
             }
             softmax<data_T, res_T, CONFIG_T>(buffer_in, buffer_out);
+            #pragma clang loop unroll(full)
             for (signed j = 0; j < CONFIG_T::n_slice; j++) {
-                #pragma HLS UNROLL
+                //#pragma HLS UNROLL
                 res[i * CONFIG_T::n_slice * CONFIG_T::n_inner + j * CONFIG_T::n_inner + k] = buffer_out[j];
             }
         }
@@ -449,11 +586,12 @@ template <class data_T, class res_T, typename CONFIG_T> void tanh(data_T data[CO
         initialized = true;
     }
 
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
     // Index into the lookup table based on data
     int data_round;
     int index;
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
         data_round = data[ii] * CONFIG_T::table_size / 8;
         index = data_round + 4 * CONFIG_T::table_size / 8;
@@ -478,11 +616,11 @@ template <int table_size, class data_T> inline unsigned get_index_unary_lut(data
 template <class data_T, class res_T, typename CONFIG_T>
 void unary_lut(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in],
                typename CONFIG_T::table_t table[CONFIG_T::table_size]) {
-    #pragma HLS function_instantiate variable=table
-    #pragma HLS ARRAY_PARTITION variable=table
+    //#pragma HLS function_instantiate variable=table
+    //#pragma HLS ARRAY_PARTITION variable=table
 
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
-        #pragma HLS UNROLL
         unsigned index = get_index_unary_lut<CONFIG_T::table_size>(data[ii]);
         res[ii] = (res_T)table[index];
     }
@@ -493,8 +631,9 @@ void unary_lut(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in],
 // *************************************************
 template <class data_T, class res_T, typename CONFIG_T>
 void hard_sigmoid(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
         auto datareg = CONFIG_T::slope * data[ii] + CONFIG_T::shift;
         if (datareg > 1)
@@ -508,9 +647,11 @@ void hard_sigmoid(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
 template <class data_T, class res_T, typename CONFIG_T>
 void hard_tanh(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
     if (CONFIG_T::io_type == io_parallel) {
-        #pragma HLS PIPELINE
+        //#pragma HLS PIPELINE
+        /// TO BE RECONSIDERED FF
     }
 
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
         auto sigmoid = CONFIG_T::slope * data[ii] + CONFIG_T::shift;
         if (sigmoid > 1)
@@ -526,9 +667,10 @@ void hard_tanh(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
 // *************************************************
 template <class data_T, class param_T, class res_T, typename CONFIG_T>
 void leaky_relu(data_T data[CONFIG_T::n_in], param_T alpha, res_T res[CONFIG_T::n_in]) {
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
     data_T datareg;
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
         datareg = data[ii];
         if (datareg > 0)
@@ -543,9 +685,10 @@ void leaky_relu(data_T data[CONFIG_T::n_in], param_T alpha, res_T res[CONFIG_T::
 // *************************************************
 template <class data_T, class param_T, class res_T, typename CONFIG_T>
 void thresholded_relu(data_T data[CONFIG_T::n_in], param_T theta, res_T res[CONFIG_T::n_in]) {
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
     data_T datareg;
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
         datareg = data[ii];
         if (datareg > theta)
@@ -558,7 +701,12 @@ void thresholded_relu(data_T data[CONFIG_T::n_in], param_T theta, res_T res[CONF
 // *************************************************
 //       Softplus Activation
 // *************************************************
-inline float softplus_fcn_float(float input) { return std::log(std::exp(input) + 1.); }
+constexpr inline float softplus_fcn_float(float input)
+{
+ using gcem::exp;
+ using gcem::log;
+ return log(exp(input) + 1.); 
+}
 
 template <typename CONFIG_T, int N_TABLE> void init_softplus_table(typename CONFIG_T::table_t table_out[N_TABLE]) {
     // Default softplus function:
@@ -588,11 +736,12 @@ void softplus(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
         initialized = true;
     }
 
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
     // Index into the lookup table based on data
     int data_round;
     int index;
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
         data_round = data[ii] * CONFIG_T::table_size / 16;
         index = data_round + 8 * CONFIG_T::table_size / 16;
@@ -607,7 +756,7 @@ void softplus(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
 // *************************************************
 //       Softsign Activation
 // *************************************************
-inline float softsign_fcn_float(float input) { return input / (std::abs(input) + 1.); }
+constexpr inline float softsign_fcn_float(float input) { return input / (std::abs(input) + 1.); }
 
 template <typename CONFIG_T, int N_TABLE> void init_softsign_table(typename CONFIG_T::table_t table_out[N_TABLE]) {
     // Default softsign function:
@@ -637,11 +786,12 @@ void softsign(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
         initialized = true;
     }
 
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
     // Index into the lookup table based on data
     int data_round;
     int index;
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
         data_round = data[ii] * CONFIG_T::table_size / 16;
         index = data_round + 8 * CONFIG_T::table_size / 16;
@@ -656,7 +806,11 @@ void softsign(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
 // *************************************************
 //       ELU Activation
 // *************************************************
-inline float elu_fcn_float(float input) { return std::exp(input) - 1.; }
+constexpr inline float elu_fcn_float(float input)
+{
+ using gcem::exp;
+ return exp(input) - 1.; 
+}
 
 template <typename CONFIG_T, int N_TABLE> void init_elu_table(typename CONFIG_T::table_t table_out[N_TABLE]) {
     // Default ELU function:
@@ -686,11 +840,12 @@ void elu(data_T data[CONFIG_T::n_in], const param_T alpha, res_T res[CONFIG_T::n
         initialized = true;
     }
 
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
     data_T datareg;
     // Index into the lookup table based on data
     int index;
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
         datareg = data[ii];
         if (datareg >= 0) {
@@ -711,8 +866,10 @@ template <class data_T, class res_T, typename CONFIG_T> void elu(data_T data[CON
 // *************************************************
 //       SELU Activation
 // *************************************************
-inline float selu_fcn_float(float input) {
-    return 1.0507009873554804934193349852946 * (1.6732632423543772848170429916717 * (std::exp(input) - 1.));
+constexpr inline float selu_fcn_float(float input)
+{
+ using gcem::exp;
+ return 1.0507009873554804934193349852946 * (1.6732632423543772848170429916717 * (exp(input) - 1.));
 }
 
 template <typename CONFIG_T, int N_TABLE> void init_selu_table(typename CONFIG_T::table_t table_out[N_TABLE]) {
@@ -742,10 +899,11 @@ template <class data_T, class res_T, typename CONFIG_T> void selu(data_T data[CO
         initialized = true;
     }
 
-    typedef ap_ufixed<16, 1> selu_const_t;
-    static const selu_const_t lambda = 1.0507009873554805;
+    //#pragma HLS PIPELINE
 
-    #pragma HLS PIPELINE
+    typedef ap_ufixed<16, 1> selu_const_t;
+    constexpr const selu_const_t lambda = 1.0507009873554805;
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
         data_T datareg = data[ii];
 
@@ -773,9 +931,10 @@ template <class data_T, class res_T, typename CONFIG_T> void selu(data_T data[CO
 // *************************************************
 template <class data_T, class param_T, class res_T, typename CONFIG_T>
 void prelu(data_T data[CONFIG_T::n_in], param_T alpha[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
     data_T datareg;
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
         datareg = data[ii];
         if (datareg > 0)
@@ -801,10 +960,11 @@ inline typename std::enable_if<(std::is_same<res_T, ap_uint<1>>::value), res_T>:
 // *************************************************
 template <class data_T, class res_T, typename CONFIG_T>
 void binary_tanh(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
     using cache_T = ap_int<2>;
     data_T datareg;
     cache_T cache;
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
         datareg = data[ii];
         if (datareg >= 0)
@@ -821,10 +981,11 @@ void binary_tanh(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
 // *************************************************
 template <class data_T, class res_T, typename CONFIG_T>
 void ternary_tanh(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
     data_T datareg;
     res_T cache;
+    #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
         datareg = 2 * data[ii];
         if (datareg > 1)

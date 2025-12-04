@@ -17,7 +17,7 @@ if echo "" | ${CC} -Werror -fsyntax-only -fno-gnu-unique -xc++ - -o /dev/null &>
 fi
 
 LDFLAGS=
-INCFLAGS="-Ifirmware/ap_types/"
+INCFLAGS="-Ifirmware/ac_types/"
 PROJECT=myproject
 LIB_STAMP=mystamp
 BASEDIR="$(cd "$(dirname "$0")" && pwd)"

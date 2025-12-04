@@ -16,13 +16,14 @@ void depthwise_mult_buffer(hls::stream<typename data_T::value_type> data_window[
     #pragma HLS INLINE
 
     typename data_T::value_type data[CONFIG_T::kernel_size * CONFIG_T::n_chan];
-    #pragma HLS ARRAY_PARTITION variable=data complete
+    //#pragma HLS ARRAY_PARTITION variable=data complete
     typename res_T::value_type res[CONFIG_T::n_chan];
-    #pragma HLS ARRAY_PARTITION variable=res complete
+    //#pragma HLS ARRAY_PARTITION variable=res complete
 
 InitData:
+    #pragma clang loop unroll(full)
     for (int id = 0; id < CONFIG_T::kernel_size * CONFIG_T::n_chan; id++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         data[id] = data_window[id].read();
     }
 
@@ -31,8 +32,9 @@ InitData:
                                            typename CONFIG_T::mult_config>::dense(data, res, weights, biases);
 
 CastLoop:
+    #pragma clang loop unroll(full)
     for (unsigned jj = 0; jj < CONFIG_T::n_chan; jj++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         if (res_T::size / CONFIG_T::n_chan == 1) {
             res_pack[jj] = res[jj];
         } else {
@@ -62,13 +64,15 @@ void compute_depthwise_output_encoded(
 
 MultLoop:
     for (unsigned p = 0; p < data_T::size / CONFIG_T::n_chan; p++) {
-    #pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+    //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
     CopyDataFilt:
+        #pragma clang loop unroll(full)
         for (unsigned f = 0; f < CONFIG_T::kernel_size; f++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         CopyDataChan:
+            #pragma clang loop unroll(full)
             for (unsigned c = 0; c < CONFIG_T::n_chan; c++) {
-                #pragma HLS UNROLL
+                //#pragma HLS UNROLL
                 if (pixel_idx[p][f])
                     data_window[f * CONFIG_T::n_chan + c].write(in_elem[p * CONFIG_T::n_chan + c]);
             }
@@ -86,17 +90,18 @@ void pointwise_mult_buffer(const data_T &data_pack, hls::stream<res_T> &res_stre
     #pragma HLS INLINE
 
     typename data_T::value_type data[CONFIG_T::n_chan];
-    #pragma HLS ARRAY_PARTITION variable=data complete
+    //#pragma HLS ARRAY_PARTITION variable=data complete
 
     typename res_T::value_type res[CONFIG_T::n_filt];
-    #pragma HLS ARRAY_PARTITION variable=res complete
+    //#pragma HLS ARRAY_PARTITION variable=res complete
 
     res_T res_pack;
     PRAGMA_DATA_PACK(res_pack)
 
 InitData:
+    #pragma clang loop unroll(full)
     for (int id = 0; id < CONFIG_T::n_chan; id++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         data[id] = data_pack[id];
     }
 
@@ -105,8 +110,9 @@ InitData:
                                            typename CONFIG_T::mult_config>::dense(data, res, weights, biases);
 
 CastLoop:
+    #pragma clang loop unroll(full)
     for (unsigned jj = 0; jj < CONFIG_T::n_filt; jj++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         res_pack[jj] = res[jj];
     }
 
@@ -128,10 +134,10 @@ void compute_depthwise_output_buffer_1d(const data_T &in_elem, hls::stream<res_T
     static int sX = 0;
 
     static typename data_T::value_type kernel_data[CONFIG_T::filt_width * CONFIG_T::n_chan];
-    #pragma HLS ARRAY_PARTITION variable=kernel_data complete
+    //#pragma HLS ARRAY_PARTITION variable=kernel_data complete
 
     typename res_T::value_type res_out[CONFIG_T::n_chan];
-    #pragma HLS ARRAY_PARTITION variable=res_out complete dim = 0
+    //#pragma HLS ARRAY_PARTITION variable=res_out complete dim = 0
 
     res_T res_pack;
     PRAGMA_DATA_PACK(res_pack)
@@ -148,8 +154,9 @@ void compute_depthwise_output_buffer_1d(const data_T &in_elem, hls::stream<res_T
 
     // Pack output
     CastLoop:
+        #pragma clang loop unroll(full)
         for (unsigned i_ic = 0; i_ic < CONFIG_T::n_filt; i_ic++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             res_pack[i_ic] = res_out[i_ic];
         }
 
@@ -189,10 +196,10 @@ void compute_depthwise_output_buffer_2d(const data_T &in_elem,
     static int sY = 0; // stride Y
 
     static typename data_T::value_type kernel_data[CONFIG_T::filt_height * CONFIG_T::filt_width * CONFIG_T::n_chan];
-    #pragma HLS ARRAY_PARTITION variable=kernel_data complete
+    //#pragma HLS ARRAY_PARTITION variable=kernel_data complete
 
     typename res_T::value_type res_out[CONFIG_T::n_chan];
-    #pragma HLS ARRAY_PARTITION variable=res_out complete dim = 0
+    //#pragma HLS ARRAY_PARTITION variable=res_out complete dim = 0
 
     res_T res_pack;
     PRAGMA_DATA_PACK(res_pack)
@@ -209,8 +216,9 @@ void compute_depthwise_output_buffer_2d(const data_T &in_elem,
 
     // Pack output
     CastLoop:
+        #pragma clang loop unroll(full)
         for (unsigned i_ic = 0; i_ic < CONFIG_T::n_filt; i_ic++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             res_pack[i_ic] = res_out[i_ic];
         }
 

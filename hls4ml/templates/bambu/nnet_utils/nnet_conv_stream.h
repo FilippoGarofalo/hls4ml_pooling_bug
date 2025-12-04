@@ -84,23 +84,25 @@ void mult_buffer(hls::stream<typename data_T::value_type> data_window[CONFIG_T::
     #pragma HLS INLINE
 
     typename data_T::value_type data[CONFIG_T::kernel_size * CONFIG_T::n_chan];
-    #pragma HLS ARRAY_PARTITION variable = data complete
+    //#pragma HLS ARRAY_PARTITION variable = data complete
     typename res_T::value_type res[CONFIG_T::n_filt];
-    #pragma HLS ARRAY_PARTITION variable = res complete
+    //#pragma HLS ARRAY_PARTITION variable = res complete
 
 InitData:
+    #pragma clang loop unroll(full)
     for (int id = 0; id < CONFIG_T::kernel_size * CONFIG_T::n_chan; id++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         data[id] = data_window[id].read();
     }
 
-    #pragma HLS INLINE recursive
+    //#pragma HLS INLINE recursive
     CONFIG_T::mult_config::template kernel<typename data_T::value_type, typename res_T::value_type,
                                            typename CONFIG_T::mult_config>::dense(data, res, weights, biases);
 
 CastLoop:
+    #pragma clang loop unroll(full)
     for (unsigned jj = 0; jj < CONFIG_T::n_filt; jj++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         if (res_T::size / CONFIG_T::n_filt == 1) {
             res_pack[jj] = res[jj];
         } else {
@@ -130,13 +132,15 @@ void compute_output_encoded(const data_T &in_elem,
 
 MultLoop:
     for (unsigned p = 0; p < data_T::size / CONFIG_T::n_chan; p++) {
-        #pragma HLS PIPELINE II = CONFIG_T::reuse_factor
+        //#pragma HLS PIPELINE II = CONFIG_T::reuse_factor
     CopyDataFilt:
+        #pragma clang loop unroll(full)
         for (unsigned f = 0; f < CONFIG_T::kernel_size; f++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
         CopyDataChan:
+            #pragma clang loop unroll(full)
             for (unsigned c = 0; c < CONFIG_T::n_chan; c++) {
-                #pragma HLS UNROLL
+                //#pragma HLS UNROLL
                 if (pixel_idx[p][f])
                     data_window[f * CONFIG_T::n_chan + c].write(in_elem[p * CONFIG_T::n_chan + c]);
             }
@@ -159,10 +163,11 @@ void kernel_shift_1d(const data_T &in_elem,
     static const int filt_width = CONFIG_T::filt_width - 1;
 KernelShiftWidth:
     for (int i_iw = 0; i_iw < filt_width; i_iw++) {
-        #pragma HLS PIPELINE II = 1
+        //#pragma HLS PIPELINE II = 1
     KernelShiftChannel:
+        #pragma clang loop unroll(full)
         for (unsigned i_ic = 0; i_ic < CONFIG_T::n_chan; i_ic++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             // Shift every element in kernel_window to the left
             kernel_window[i_iw * CONFIG_T::n_chan + i_ic] = kernel_window[(i_iw + 1) * CONFIG_T::n_chan + i_ic];
         }
@@ -171,8 +176,9 @@ KernelShiftWidth:
     // Insert shift_buffer column into right-most column of kernel
     static const int lastheight = (CONFIG_T::filt_width - 1) * CONFIG_T::n_chan;
 KernelPushChannel:
+    #pragma clang loop unroll(full)
     for (int i_ic = 0; i_ic < CONFIG_T::n_chan; i_ic++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         kernel_window[lastheight + i_ic] = in_elem[i_ic];
     }
 }
@@ -187,7 +193,7 @@ void kernel_shift_2d(
     static const int filt_width = CONFIG_T::filt_width - 1;
 KernelShiftWidth:
     for (int i_iw = 0; i_iw < filt_width; i_iw++) {
-        #pragma HLS PIPELINE II = 1
+        //#pragma HLS PIPELINE II = 1
     KernelShiftHeight:
         for (unsigned i_ih = 0; i_ih < CONFIG_T::filt_height; i_ih++) {
         KernelShiftChannel:
@@ -202,8 +208,9 @@ KernelShiftWidth:
     // Insert shift_buffer column into right-most column of kernel
     static const int lastheight = (CONFIG_T::filt_width - 1) * CONFIG_T::n_chan;
 KernelPushHeight:
+    #pragma clang loop unroll(full)
     for (int i_ih = 0; i_ih < CONFIG_T::filt_height; i_ih++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
     KernelPushChannel:
         for (int i_ic = 0; i_ic < CONFIG_T::n_chan; i_ic++) {
             kernel_window[lastheight + i_ih * CONFIG_T::filt_width * CONFIG_T::n_chan + i_ic] = shift_buffer[i_ih][i_ic];
@@ -218,15 +225,16 @@ void shift_line_buffer(
                                                                              [CONFIG_T::n_chan],
     typename data_T::value_type kernel_window[CONFIG_T::filt_height * CONFIG_T::filt_width * CONFIG_T::n_chan]) {
 
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
     // Temporary buffer for popped (shifted) elements
     typename data_T::value_type shift_buffer[CONFIG_T::filt_height][CONFIG_T::n_chan];
-    #pragma HLS ARRAY_PARTITION variable = shift_buffer complete dim = 0
+    //#pragma HLS ARRAY_PARTITION variable = shift_buffer complete dim = 0
 
 UpdateBuffer:
+    #pragma clang loop unroll(full)
     for (int i_ic = 0; i_ic < CONFIG_T::n_chan; i_ic++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
 
         // Insert pixel(s) at end of shift buffer
         shift_buffer[CONFIG_T::filt_height - 1][i_ic] = in_elem[i_ic];
@@ -236,8 +244,9 @@ LineBufferDataIn:
     for (int i_ic = 0; i_ic < CONFIG_T::n_chan; i_ic++) {
     // Shift the shift buffer into the line buffer
     LineBufferShift:
+        #pragma clang loop unroll(full)
         for (unsigned i_ih = 1; i_ih < CONFIG_T::filt_height; i_ih++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             typename data_T::value_type pop_elem = line_buffer[i_ih - 1][i_ic].shift(
                 shift_buffer[CONFIG_T::filt_height - i_ih][i_ic]); // Shift the line buffer, return the popped pixel
             shift_buffer[CONFIG_T::filt_height - i_ih - 1][i_ic] =
@@ -269,10 +278,10 @@ void compute_output_buffer_2d(
     static int sY = 0; // Stride Y
 
     static typename data_T::value_type kernel_data[CONFIG_T::filt_height * CONFIG_T::filt_width * CONFIG_T::n_chan];
-    #pragma HLS ARRAY_PARTITION variable = kernel_data complete
+    //#pragma HLS ARRAY_PARTITION variable = kernel_data complete
 
     typename res_T::value_type res_out[CONFIG_T::n_filt];
-    #pragma HLS ARRAY_PARTITION variable = res_out complete dim = 0
+    //#pragma HLS ARRAY_PARTITION variable = res_out complete dim = 0
 
     res_T res_pack;
     PRAGMA_DATA_PACK(res_pack)
@@ -290,8 +299,9 @@ void compute_output_buffer_2d(
 
     // Pack output
     CastLoop:
+        #pragma clang loop unroll(full)
         for (unsigned i_ic = 0; i_ic < CONFIG_T::n_filt; i_ic++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             res_pack[i_ic] = res_out[i_ic];
         }
 
@@ -335,10 +345,10 @@ void compute_output_buffer_1d(
     static int sX = 0; // stride counter
 
     static typename data_T::value_type kernel_data[CONFIG_T::filt_width * CONFIG_T::n_chan];
-    #pragma HLS ARRAY_PARTITION variable = kernel_data complete
+    //#pragma HLS ARRAY_PARTITION variable = kernel_data complete
 
     typename res_T::value_type res_out[CONFIG_T::n_filt];
-    #pragma HLS ARRAY_PARTITION variable = res_out complete dim = 0
+    //#pragma HLS ARRAY_PARTITION variable = res_out complete dim = 0
 
     res_T res_pack;
     PRAGMA_DATA_PACK(res_pack)
@@ -356,8 +366,9 @@ void compute_output_buffer_1d(
 
     // Pack output
     CastLoop:
+        #pragma clang loop unroll(full)
         for (unsigned i_ic = 0; i_ic < CONFIG_T::n_filt; i_ic++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             res_pack[i_ic] = res_out[i_ic];
         }
 

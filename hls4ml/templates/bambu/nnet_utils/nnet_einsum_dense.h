@@ -45,8 +45,8 @@ void einsum_dense(
     data_T inp_tpose[CONFIG_T::n_free_data * CONFIG_T::n_contract * CONFIG_T::n_inplace];
     res_T out_tpose[CONFIG_T::n_free_data * CONFIG_T::n_free_kernel * CONFIG_T::n_inplace];
     res_T out_buffer[CONFIG_T::n_free_kernel];
-    #pragma HLS ARRAY_PARTITION variable = inp_tpose complete
-    #pragma HLS ARRAY_PARTITION variable = out_tpose complete
+    //#pragma HLS ARRAY_PARTITION variable = inp_tpose complete
+    //#pragma HLS ARRAY_PARTITION variable = out_tpose complete
 
     nnet::transpose<data_T, data_T, typename CONFIG_T::tpose_inp_conf>(data, inp_tpose);
 
@@ -55,16 +55,19 @@ void einsum_dense(
     constexpr unsigned C = CONFIG_T::n_contract;
     constexpr unsigned I = CONFIG_T::n_inplace;
 
+    #pragma clang loop unroll_count(CONFIG_T::parallelization_factor)
     for (unsigned l0 = 0; l0 < L0; l0++) {
-        #pragma HLS UNROLL factor = CONFIG_T::parallelization_factor
+        //#pragma HLS UNROLL factor = CONFIG_T::parallelization_factor
+        #pragma clang loop unroll(full)
         for (unsigned i = 0; i < I; i++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
             // even w/o explicit distributed arithmetic optimization, latency kernels are partially implemented as such
             // so reusing the same multiplier for different weights doesn't really help... only full unrolling for now
             dense<data_T, res_T, typename CONFIG_T::dense_conf>(&inp_tpose[(i * L0 + l0) * C], out_buffer,
                                                                 &weights[(i * L1 * C)], &biases[((i * L0 + l0) * L1)]);
+            #pragma clang loop unroll(full)
             for (unsigned j = 0; j < L1; j++) {
-                #pragma HLS UNROLL
+                //#pragma HLS UNROLL
                 out_tpose[(i * L0 + l0) * L1 + j] = out_buffer[j];
             }
         }
@@ -82,8 +85,8 @@ einsum_dense(data_T data[CONFIG_T::n_free_data * CONFIG_T::n_contract * CONFIG_T
     data_T inp_tpose[CONFIG_T::n_free_data * CONFIG_T::n_contract * CONFIG_T::n_inplace];
     typename CONFIG_T::accum_t out_tpose[CONFIG_T::n_free_data * CONFIG_T::n_free_kernel * CONFIG_T::n_inplace];
 
-    #pragma HLS ARRAY_PARTITION variable = inp_tpose complete
-    #pragma HLS ARRAY_PARTITION variable = out_tpose complete
+    //#pragma HLS ARRAY_PARTITION variable = inp_tpose complete
+    //#pragma HLS ARRAY_PARTITION variable = out_tpose complete
 
     nnet::transpose<data_T, data_T, typename CONFIG_T::tpose_inp_conf>(data, inp_tpose);
 
@@ -92,12 +95,14 @@ einsum_dense(data_T data[CONFIG_T::n_free_data * CONFIG_T::n_contract * CONFIG_T
     constexpr unsigned C = CONFIG_T::n_contract;
     constexpr unsigned I = CONFIG_T::n_inplace;
 
+    #pragma clang loop unroll(full)
     for (unsigned l0 = 0; l0 < L0; l0++) {
-        #pragma HLS UNROLL factor = CONFIG_T::parallelization_factor
+        //#pragma HLS UNROLL factor = CONFIG_T::parallelization_factor
         CONFIG_T::da_kernel(inp_tpose, out_tpose, l0);
     }
+    #pragma clang loop unroll(full)
     for (unsigned ii = 0; ii < (L0 * L1 * I); ii++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
         out_tpose[ii] = out_tpose[ii] + biases[ii];
     }
 

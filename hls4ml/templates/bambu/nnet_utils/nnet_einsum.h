@@ -31,16 +31,16 @@ template <typename data0_T, typename data1_T, typename res_T, typename CONFIG_T>
 void einsum(const data0_T data0[CONFIG_T::tpose_inp0_config::N], const data1_T data1[CONFIG_T::tpose_inp1_config::N],
             res_T res[CONFIG_T::tpose_out_conf::N]) {
 
-    #pragma HLS PIPELINE II = CONFIG_T::reuse_factor
-    #pragma HLS ALLOCATION operation instances = mul limit = CONFIG_T::multiplier_limit
+    //#pragma HLS PIPELINE II = CONFIG_T::reuse_factor
+    //#pragma HLS ALLOCATION operation instances = mul limit = CONFIG_T::multiplier_limit
 
     data0_T tpose_i0[CONFIG_T::tpose_inp0_config::N];
     data1_T tpose_i1[CONFIG_T::tpose_inp1_config::N];
     res_T tpose_o[CONFIG_T::tpose_out_conf::N];
 
-    #pragma HLS ARRAY_PARTITION variable = tpose_i0 complete
-    #pragma HLS ARRAY_PARTITION variable = tpose_i1 complete
-    #pragma HLS ARRAY_PARTITION variable = tpose_o complete
+    //#pragma HLS ARRAY_PARTITION variable = tpose_i0 complete
+    //#pragma HLS ARRAY_PARTITION variable = tpose_i1 complete
+    //#pragma HLS ARRAY_PARTITION variable = tpose_o complete
 
     nnet::transpose<data0_T, data0_T, typename CONFIG_T::tpose_inp0_config>(data0, tpose_i0);
     nnet::transpose<data1_T, data1_T, typename CONFIG_T::tpose_inp1_config>(data1, tpose_i1);
@@ -56,15 +56,19 @@ void einsum(const data0_T data0[CONFIG_T::tpose_inp0_config::N], const data1_T d
     constexpr unsigned I = CONFIG_T::n_inplace;
 
     typename CONFIG_T::accum_t accum_buf;
+    #pragma clang loop unroll(full)
     for (unsigned i = 0; i < I; i++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
+        #pragma clang loop unroll(full)
         for (unsigned l0 = 0; l0 < L0; l0++) {
-            #pragma HLS UNROLL
+            //#pragma HLS UNROLL
+            #pragma clang loop unroll(full)
             for (unsigned l1 = 0; l1 < L1; l1++) {
-                #pragma HLS UNROLL
+                //#pragma HLS UNROLL
                 accum_buf = 0;
+                #pragma clang loop unroll(full)
                 for (unsigned c = 0; c < C; c++) {
-                    #pragma HLS UNROLL
+                    //#pragma HLS UNROLL
                     data0_T a = tpose_i0[(i * L0 + l0) * C + c];
                     data1_T b = tpose_i1[i * L1 * C + l1 * C + c];
                     accum_buf += CONFIG_T::template product<data0_T, data1_T>::product(a, b);

@@ -16,8 +16,9 @@ void compute_scaled_indices_2d(const unsigned h_idx, const unsigned w_idx,
     unsigned wp_idx = w_idx * (data_T::size / CONFIG_T::n_chan);
 
 ComputeIndex:
+    #pragma clang loop unroll(full)
     for (unsigned p = 0; p < data_T::size / CONFIG_T::n_chan; p++) {
-        #pragma HLS UNROLL
+        //#pragma HLS UNROLL
 
         unsigned sw_idx = CONFIG_T::template scale_index_width<CONFIG_T::filt_width, CONFIG_T::stride_width,
                                                                CONFIG_T::in_width>::scale_index(wp_idx + p);
@@ -36,26 +37,26 @@ void conv_2d_encoded_cl(
     hls::stream<typename data_T::value_type> data_window[CONFIG_T::filt_height * CONFIG_T::filt_width * CONFIG_T::n_chan];
     const int win_depth = CONFIG_T::filt_height * CONFIG_T::out_width;
     for (unsigned i_out = 0; i_out < CONFIG_T::filt_height * CONFIG_T::filt_width * CONFIG_T::n_chan; i_out++) {
-        #pragma HLS STREAM variable=data_window[i_out] depth=win_depth
+        //#pragma HLS STREAM variable=data_window[i_out] depth=win_depth
     }
 
-    #pragma HLS ARRAY_PARTITION variable=CONFIG_T::pixels complete
+    //#pragma HLS ARRAY_PARTITION variable=CONFIG_T::pixels complete
 
     res_T res_pack;
     PRAGMA_DATA_PACK(res_pack)
     unsigned outputs_ready = 0;
 
     ap_uint<CONFIG_T::filt_height * CONFIG_T::filt_width> pixel_idx[data_T::size / CONFIG_T::n_chan];
-    #pragma HLS ARRAY_PARTITION variable=pixel_idx complete
+    //#pragma HLS ARRAY_PARTITION variable=pixel_idx complete
 
 ReadInputHeight:
     for (unsigned i_ih = 0; i_ih < CONFIG_T::in_height; i_ih++) {
     ReadInputWidth:
         for (unsigned i_iw = 0; i_iw < CONFIG_T::in_width / (data_T::size / CONFIG_T::n_chan); i_iw++) {
-            #pragma HLS LOOP_FLATTEN
+            //#pragma HLS LOOP_FLATTEN
             if ((CONFIG_T::strategy == nnet::latency || CONFIG_T::strategy == nnet::distributed_arithmetic) &&
                 data_T::size / CONFIG_T::n_chan == 1) {
-                #pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+                //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
             }
             compute_scaled_indices_2d<data_T, CONFIG_T>(i_ih, i_iw, pixel_idx);
             compute_output_encoded<data_T, res_T, CONFIG_T>(data.read(), data_window, res, res_pack, outputs_ready, weights,
@@ -74,20 +75,20 @@ void conv_2d_buffer_cl(
 
     static ap_shift_reg<typename data_T::value_type, CONFIG_T::in_width> line_buffer[MAX(CONFIG_T::filt_height - 1, 1)]
                                                                                     [CONFIG_T::n_chan];
-    #pragma HLS ARRAY_PARTITION variable = line_buffer complete dim = 2
+    //#pragma HLS ARRAY_PARTITION variable = line_buffer complete dim = 2
 
     if (CONFIG_T::strategy == nnet::resource_unrolled && CONFIG_T::reuse_factor > 1) {
-        #pragma HLS allocation instances=compute_output_buffer_1d limit=1 function
-        #pragma HLS allocation instances=compute_output_buffer_2d limit=1 function
+        //#pragma HLS allocation instances=compute_output_buffer_1d limit=1 function
+        //#pragma HLS allocation instances=compute_output_buffer_2d limit=1 function
     }
 
 ReadInputHeight:
     for (unsigned i_ih = 0; i_ih < CONFIG_T::in_height; i_ih++) {
     ReadInputWidth:
         for (unsigned i_iw = 0; i_iw < CONFIG_T::in_width; i_iw++) {
-            #pragma HLS LOOP_FLATTEN
+            //#pragma HLS LOOP_FLATTEN
             if (CONFIG_T::strategy == nnet::latency || CONFIG_T::strategy == nnet::distributed_arithmetic) {
-                #pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+                //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
             }
             if (CONFIG_T::filt_height > 1) {
                 compute_output_buffer_2d<data_T, res_T, CONFIG_T>(data.read(), line_buffer, res, weights, biases);

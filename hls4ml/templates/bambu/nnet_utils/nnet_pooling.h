@@ -80,11 +80,11 @@ template <typename CONFIG_T> constexpr int pool_op_limit_1d() {
 
 template <class data_T, class res_T, typename CONFIG_T>
 void pooling1d_cl(data_T data[CONFIG_T::n_in * CONFIG_T::n_filt], res_T res[CONFIG_T::n_out * CONFIG_T::n_filt]) {
-    #pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+    //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
 
     // TODO partition the arrays according to the reuse factor
     const int limit = pool_op_limit_1d<CONFIG_T>();
-    #pragma HLS ALLOCATION function instances=CONFIG_T::pool_op limit=limit
+    //#pragma HLS ALLOCATION function instances=CONFIG_T::pool_op limit=limit
     // Add any necessary padding
 
     // Add padding and reduce input width to area covered by pooling function
@@ -97,7 +97,7 @@ void pooling1d_cl(data_T data[CONFIG_T::n_in * CONFIG_T::n_filt], res_T res[CONF
         for (int ii = 0; ii < restricted_padded_width; ii += CONFIG_T::stride_width) {
             unsigned overlap_pixel = 0;
             data_T pool[CONFIG_T::pool_width];
-            #pragma HLS ARRAY_PARTITION variable=pool complete dim=0
+            //#pragma HLS ARRAY_PARTITION variable=pool complete dim=0
 
             for (int jj = 0; jj < CONFIG_T::pool_width; jj++) {
                 if (ii + jj >= CONFIG_T::pad_left && ii + jj < CONFIG_T::n_in + CONFIG_T::pad_left) {
@@ -117,18 +117,18 @@ void pooling1d_cl(data_T data[CONFIG_T::n_in * CONFIG_T::n_filt], res_T res[CONF
 
 template <class data_T, class res_T, typename CONFIG_T>
 void global_pooling1d_cl(data_T data[CONFIG_T::n_in * CONFIG_T::n_filt], res_T res[CONFIG_T::n_filt]) {
-    #pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+    //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
 
     assert(CONFIG_T::pad_left == 0 && CONFIG_T::pad_right == 0);
     assert(CONFIG_T::pool_width == CONFIG_T::stride_width);
 
     // TODO partition the arrays according to the reuse factor
     const int limit = pool_op_limit_1d<CONFIG_T>();
-    #pragma HLS ALLOCATION function instances=CONFIG_T::pool_op limit=limit
+    //#pragma HLS ALLOCATION function instances=CONFIG_T::pool_op limit=limit
 
     for (int ff = 0; ff < CONFIG_T::n_filt; ff++) {
         data_T pool[CONFIG_T::n_in];
-        #pragma HLS ARRAY_PARTITION variable=pool complete dim=0
+        //#pragma HLS ARRAY_PARTITION variable=pool complete dim=0
         for (int jj = 0; jj < CONFIG_T::n_in; jj++) {
             pool[jj] = data[jj * CONFIG_T::n_filt + ff];
         }
@@ -170,11 +170,11 @@ template <typename CONFIG_T> constexpr int pool_op_limit() {
 template <class data_T, class res_T, typename CONFIG_T>
 void pooling2d_cl(data_T data[CONFIG_T::in_height * CONFIG_T::in_width * CONFIG_T::n_filt],
                   res_T res[CONFIG_T::out_height * CONFIG_T::out_width * CONFIG_T::n_filt]) {
-    #pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+    //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
 
     // TODO partition the arrays according to the reuse factor
     const int limit = pool_op_limit<CONFIG_T>();
-    #pragma HLS ALLOCATION function instances=CONFIG_T::pool_op limit=limit
+    //#pragma HLS ALLOCATION function instances=CONFIG_T::pool_op limit=limit
 
     // Add padding and reduce input width to area covered by pooling function
     static constexpr int full_padded_width = CONFIG_T::in_width + CONFIG_T::pad_left + CONFIG_T::pad_right;
@@ -191,7 +191,7 @@ void pooling2d_cl(data_T data[CONFIG_T::in_height * CONFIG_T::in_width * CONFIG_
             // Loop over input image x in steps of stride
             for (int jj = 0; jj < restricted_padded_width; jj += CONFIG_T::stride_width) {
                 data_T pool[CONFIG_T::pool_height * CONFIG_T::pool_width];
-                #pragma HLS ARRAY_PARTITION variable=pool complete dim=0
+                //#pragma HLS ARRAY_PARTITION variable=pool complete dim=0
 
                 unsigned overlap_pixel = 0;
 
@@ -227,11 +227,11 @@ void pooling2d_cl(data_T data[CONFIG_T::in_height * CONFIG_T::in_width * CONFIG_
 template <class data_T, class res_T, typename CONFIG_T>
 void pooling2d_cf(data_T data[CONFIG_T::in_height * CONFIG_T::in_width * CONFIG_T::n_filt],
                   res_T res[CONFIG_T::out_height * CONFIG_T::out_width * CONFIG_T::n_filt]) {
-    #pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+    //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
 
     // TODO partition the arrays according to the reuse factor
     const int limit = pool_op_limit<CONFIG_T>();
-    #pragma HLS ALLOCATION function instances=CONFIG_T::pool_op limit=limit
+    //#pragma HLS ALLOCATION function instances=CONFIG_T::pool_op limit=limit
     // Add padding and reduce input width to area covered by pooling function
     static constexpr int full_padded_width = CONFIG_T::in_width + CONFIG_T::pad_left + CONFIG_T::pad_right;
     static constexpr int full_padded_height = CONFIG_T::in_height + CONFIG_T::pad_top + CONFIG_T::pad_bottom;
@@ -244,7 +244,7 @@ void pooling2d_cf(data_T data[CONFIG_T::in_height * CONFIG_T::in_width * CONFIG_
             // Loop over input image x in steps of stride
             for (int jj = 0; jj < restricted_padded_width; jj += CONFIG_T::stride_width) {
                 data_T pool[CONFIG_T::pool_height * CONFIG_T::pool_width];
-                #pragma HLS ARRAY_PARTITION variable=pool complete dim=0
+                //#pragma HLS ARRAY_PARTITION variable=pool complete dim=0
                 // Keep track of number of pixels in image vs padding region
                 unsigned img_overlap = 0;
                 // Loop over pool window y
@@ -292,10 +292,10 @@ void global_pooling2d_cl(data_T data[CONFIG_T::in_height * CONFIG_T::in_width * 
     assert(CONFIG_T::pool_width == CONFIG_T::stride_width);
     assert(CONFIG_T::pool_height == CONFIG_T::stride_height);
 
-    #pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+    //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
 
     const int limit = pool_op_limit<CONFIG_T>();
-    #pragma HLS ALLOCATION instances=pool_op limit=limit function
+    //#pragma HLS ALLOCATION instances=pool_op limit=limit function
 
 FiltLoop:
     for (int filt = 0; filt < CONFIG_T::n_filt; filt++) {

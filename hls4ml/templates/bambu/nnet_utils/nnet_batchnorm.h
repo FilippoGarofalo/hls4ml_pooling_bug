@@ -34,18 +34,18 @@ void normalize(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in],
     data_T cache;
 
     // Use a function_instantiate in case it helps to explicitly optimize unchanging weights/biases
-    #pragma HLS function_instantiate variable=scale,bias
+    //#pragma HLS function_instantiate variable=scale,bias
 
     // For parallel inputs:
     //   - completely partition arrays -- target fabric
     //   - if we have an unroll factor, limit number of multipliers
-    #pragma HLS PIPELINE II=CONFIG_T::reuse_factor
+    //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
 
     // #pragma HLS ARRAY_PARTITION variable=weights complete // remove this line for now, it breaks compression sometimes
-    #pragma HLS ARRAY_PARTITION variable=scale complete
-    #pragma HLS ARRAY_PARTITION variable=bias complete
+    //#pragma HLS ARRAY_PARTITION variable=scale complete
+    //#pragma HLS ARRAY_PARTITION variable=bias complete
 
-    #pragma HLS ALLOCATION operation instances=mul limit=CONFIG_T::multiplier_limit
+    //#pragma HLS ALLOCATION operation instances=mul limit=CONFIG_T::multiplier_limit
 
 // Calcuate result
 Result:
@@ -80,8 +80,8 @@ struct batchnorm_quantized_tanh_config {
 template <class data_T, typename CONFIG_T>
 void normalize_binary_tanh(data_T data[CONFIG_T::n_in], ap_uint<1> res[CONFIG_T::n_in],
                            data_T threshold[CONFIG_T::n_scale_bias]) {
-    #pragma HLS PIPELINE
-    #pragma HLS ARRAY_PARTITION variable=res complete
+    //#pragma HLS PIPELINE
+    //#pragma HLS ARRAY_PARTITION variable=res complete
 
     data_T datareg;
     ap_uint<1> cache;
@@ -100,8 +100,8 @@ void normalize_binary_tanh(data_T data[CONFIG_T::n_in], ap_uint<1> res[CONFIG_T:
 template <class data_T, typename CONFIG_T>
 void normalize_ternary_tanh(data_T data[CONFIG_T::n_in], ap_int<2> res[CONFIG_T::n_in],
                             data_T threshold_hi[CONFIG_T::n_scale_bias], data_T threshold_lo[CONFIG_T::n_scale_bias]) {
-    #pragma HLS PIPELINE
-    #pragma HLS ARRAY_PARTITION variable=res complete
+    //#pragma HLS PIPELINE
+    //#pragma HLS ARRAY_PARTITION variable=res complete
 
     data_T datareg;
     ap_int<2> cache;

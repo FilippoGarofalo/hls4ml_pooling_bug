@@ -111,15 +111,17 @@ template <class CONFIG_T, class E = typename CONFIG_T::edge_weight_t> struct Mea
 
     Means() {
         #pragma HLS INLINE
-        #pragma HLS ARRAY_PARTITION variable=edge_weight_mean complete
-        #pragma HLS ARRAY_PARTITION variable=weighted_feature_mean complete
-        #pragma HLS UNROLL region
+        //#pragma HLS ARRAY_PARTITION variable=edge_weight_mean complete
+        //#pragma HLS ARRAY_PARTITION variable=weighted_feature_mean complete
+        //#pragma HLS UNROLL region
 
     Aggregators:
+        #pragma clang loop unroll(full)
         for (unsigned ia = 0; ia < CONFIG_T::n_aggregators; ++ia) {
             edge_weight_mean[ia] = 0.;
 
         InFeatures:
+            #pragma clang loop unroll(full)
             for (unsigned ix = 0; ix < CONFIG_T::n_in_features; ++ix) {
                 unsigned const iax = ia * CONFIG_T::n_in_features + ix;
                 weighted_feature_mean[iax] = 0.;
@@ -152,16 +154,18 @@ template <class CONFIG_T, class E = typename CONFIG_T::edge_weight_t> struct Mea
     template <class nvtx_T, class arrays_T, class T = CONFIG_T>
     typename std::enable_if<T::mean_by_nvert>::type set_means_normalized(nvtx_T const nvtx, arrays_T const &accum) {
         #pragma HLS INLINE
-        #pragma HLS UNROLL region
+        //#pragma HLS UNROLL region
 
         // accum comes divided by unroll factor
         typename T::norm_t nvtx_norm = (T::n_vertices / T::reuse_factor) / nvtx;
 
     Aggregators:
+        #pragma clang loop unroll(full)
         for (unsigned ia = 0; ia < T::n_aggregators; ++ia) {
             edge_weight_mean[ia] = accum.edge_weight_mean[ia] * nvtx_norm;
 
         InFeatures:
+            #pragma clang loop unroll(full)
             for (unsigned ix = 0; ix < T::n_in_features; ++ix) {
                 unsigned const iax = ia * T::n_in_features + ix;
 
@@ -173,14 +177,16 @@ template <class CONFIG_T, class E = typename CONFIG_T::edge_weight_t> struct Mea
     template <class nvtx_T, class arrays_T, class T = CONFIG_T>
     typename std::enable_if<not T::mean_by_nvert>::type set_means_normalized(nvtx_T const nvtx, arrays_T const &accum) {
         #pragma HLS INLINE
-        #pragma HLS UNROLL region
+        //#pragma HLS UNROLL region
 
     Aggregators:
+        #pragma clang loop unroll(full)
         for (unsigned ia = 0; ia < T::n_aggregators; ++ia) {
 
             edge_weight_mean[ia] = normalize_log2(accum.edge_weight_mean[ia], T::log2_reuse_factor);
 
         InFeatures:
+            #pragma clang loop unroll(full)
             for (unsigned ix = 0; ix < T::n_in_features; ++ix) {
                 unsigned const iax = ia * T::n_in_features + ix;
 
@@ -198,7 +204,7 @@ template <class CONFIG_T, class E = typename CONFIG_T::edge_weight_t> struct Wei
     WeightsAndMeans() : Means<CONFIG_T, E>() {
         #pragma HLS INLINE
         unsigned const reshape_factor = CONFIG_T::n_aggregators * (CONFIG_T::n_vertices / CONFIG_T::reuse_factor);
-        #pragma HLS ARRAY_PARTITION variable=edge_weights cyclic factor=reshape_factor
+        //#pragma HLS ARRAY_PARTITION variable=edge_weights cyclic factor=reshape_factor
     }
 
     void set_weight(unsigned iva, edge_weight_t const &weight) {
@@ -227,10 +233,11 @@ struct OutputBiasNormalizer<CONFIG_T, nvtx_T, typename std::enable_if<not CONFIG
     biases_t output_biases[CONFIG_T::n_out_features];
 
     OutputBiasNormalizer(nvtx_T const nvtx) {
-        #pragma HLS ARRAY_PARTITION variable=output_biases complete
-        #pragma HLS UNROLL region
+        //#pragma HLS ARRAY_PARTITION variable=output_biases complete
+        //#pragma HLS UNROLL region
 
         // Cannot add a loop label here due to a Vivado HLS bug, apparently
+        #pragma clang loop unroll(full)
         for (unsigned io = 0; io < CONFIG_T::n_out_features; ++io) {
             typename CONFIG_T::aggr_t bias = CONFIG_T::output_transform_biases[io];
             bias *= nvtx;
@@ -337,12 +344,13 @@ Aggregators:
 template <class CONFIG_T, class arrays_T>
 inline typename CONFIG_T::aggr_t compute_output_base_core(arrays_T const &arrays, unsigned io, unsigned ia) {
     #pragma HLS INLINE
-    #pragma HLS UNROLL region
+    //#pragma HLS UNROLL region
 
     unsigned const ioa = io * CONFIG_T::n_aggregators + ia;
     typename CONFIG_T::aggr_t aggr = arrays.edge_weight_mean[ia] * CONFIG_T::input_transform_biases[ioa];
 
 InFeatures:
+    #pragma clang loop unroll(full)
     for (unsigned ix = 0; ix < CONFIG_T::n_in_features; ++ix) {
         unsigned const ioax = ioa * CONFIG_T::n_in_features + ix;
         unsigned const iax = ia * CONFIG_T::n_in_features + ix;
@@ -357,11 +365,13 @@ template <class CONFIG_T, class arrays_T>
 inline void compute_output_base(arrays_T const &arrays,
                                 typename CONFIG_T::aggr_t output_base[CONFIG_T::n_out_features * CONFIG_T::n_aggregators]) {
     #pragma HLS INLINE
-    #pragma HLS UNROLL region
+    //#pragma HLS UNROLL region
 
 OutFeatures:
+    #pragma clang loop unroll(full)
     for (unsigned io = 0; io < CONFIG_T::n_out_features; ++io) {
     Aggregators:
+        #pragma clang loop unroll(full)
         for (unsigned ia = 0; ia < CONFIG_T::n_aggregators; ++ia) {
             unsigned const ioa = io * CONFIG_T::n_aggregators + ia;
 
@@ -378,7 +388,7 @@ compute_vertex_output(arrays_T const &arrays, unsigned iv,
     #pragma HLS INLINE
 
     typename arrays_T::edge_weight_t edge_weights[CONFIG_T::n_aggregators];
-    #pragma HLS ARRAY_PARTITION variable=edge_weights complete
+    //#pragma HLS ARRAY_PARTITION variable=edge_weights complete
 
 Aggregators1:
     for (unsigned ia = 0; ia < CONFIG_T::n_aggregators; ++ia) {
@@ -413,7 +423,7 @@ void aggregate(data_T const data[CONFIG_T::n_vertices * CONFIG_T::n_in_features]
 
 VerticesOuter:
     for (unsigned ivv = 0; ivv < CONFIG_T::reuse_factor; ++ivv) {
-        #pragma HLS PIPELINE
+        //#pragma HLS PIPELINE
 
         if (ivv * unroll_factor >= nvtx)
             break;
@@ -441,7 +451,7 @@ void distribute(nvtx_T const nvtx, arrays_T const &arrays, res_T res[CONFIG_T::n
     OutputResSetter<CONFIG_T, res_T> res_setter(res);
 
     typename CONFIG_T::aggr_t output_base[CONFIG_T::n_out_features * CONFIG_T::n_aggregators];
-    #pragma HLS ARRAY_PARTITION variable=output_base complete
+    //#pragma HLS ARRAY_PARTITION variable=output_base complete
 
     compute_output_base<CONFIG_T>(arrays, output_base);
 
@@ -449,7 +459,7 @@ void distribute(nvtx_T const nvtx, arrays_T const &arrays, res_T res[CONFIG_T::n
 
 VerticesOuter:
     for (unsigned ivv = 0; ivv < CONFIG_T::reuse_factor; ++ivv) {
-        #pragma HLS PIPELINE
+        //#pragma HLS PIPELINE
 
         if (ivv * unroll_factor >= nvtx)
             break;
@@ -469,7 +479,7 @@ VerticesOuter:
 template <class CONFIG_T, class output_biases_T, class arrays_T, class res_T>
 void set_output(output_biases_T const &output_transform_biases, arrays_T const &arrays,
                 res_T res[CONFIG_T::n_out_features]) {
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
 OutFeatures:
     for (unsigned io = 0; io < CONFIG_T::n_out_features; ++io) {
@@ -491,7 +501,7 @@ void distribute_aggregate(nvtx_T const nvtx, prev_arrays_T const &prev_arrays, c
     typedef typename prev_layer_t::output_t data_T;
 
     typename prev_layer_t::aggr_t prev_output_base[prev_layer_t::n_out_features * prev_layer_t::n_aggregators];
-    #pragma HLS ARRAY_PARTITION variable=prev_output_base complete
+    //#pragma HLS ARRAY_PARTITION variable=prev_output_base complete
 
     compute_output_base<prev_layer_t>(prev_arrays, prev_output_base);
 
@@ -501,7 +511,7 @@ void distribute_aggregate(nvtx_T const nvtx, prev_arrays_T const &prev_arrays, c
 
 VerticesOuter:
     for (unsigned ivv = 0; ivv < current_layer_t::reuse_factor; ++ivv) {
-        #pragma HLS PIPELINE
+        //#pragma HLS PIPELINE
 
         if (ivv * unroll_factor >= nvtx)
             break;
@@ -516,7 +526,7 @@ VerticesOuter:
                 break;
 
             data_T data[prev_layer_t::n_out_features];
-            #pragma HLS ARRAY_PARTITION variable=data complete
+            //#pragma HLS ARRAY_PARTITION variable=data complete
 
             SingleVertexResSetter<prev_layer_t, data_T> res_setter(data);
 
@@ -604,7 +614,7 @@ template <class data_T, class nvtx_T, class res_T, typename CONFIG_T>
 typename std::enable_if<CONFIG_T::output_collapse == CONFIG_T::no_collapse>::type
 garnet(data_T const data[CONFIG_T::n_vertices * CONFIG_T::n_in_features], nvtx_T const nvtx[1],
        res_T res[CONFIG_T::n_vertices * CONFIG_T::n_out_features]) {
-    #pragma HLS DATAFLOW
+    //#pragma HLS DATAFLOW
 
     garnet_utils::WeightsAndMeans<CONFIG_T> arrays;
 
@@ -618,7 +628,7 @@ template <class data_T, class nvtx_T, class res_T, class CONFIG_T>
 typename std::enable_if<CONFIG_T::output_collapse == CONFIG_T::collapse_mean>::type
 garnet(data_T const data[CONFIG_T::n_vertices * CONFIG_T::n_in_features], nvtx_T const nvtx[1],
        res_T res[CONFIG_T::n_out_features]) {
-    #pragma HLS DATAFLOW
+    //#pragma HLS DATAFLOW
 
     garnet_utils::Means<CONFIG_T> arrays;
 
@@ -634,7 +644,7 @@ template <class data_T, class nvtx_T, class res_T, class CONFIG_T>
 typename std::enable_if<CONFIG_T::output_collapse == CONFIG_T::no_collapse>::type
 garnet_stack(data_T const data[CONFIG_T::n_vertices * CONFIG_T::n_in_features], nvtx_T const nvtx[1],
              res_T res[CONFIG_T::n_vertices * CONFIG_T::n_out_features]) {
-    #pragma HLS DATAFLOW
+    //#pragma HLS DATAFLOW
 
     typedef typename CONFIG_T::template sublayer_t<0> first_layer_t;
     unsigned const ilast = CONFIG_T::n_sublayers - 1;
@@ -656,7 +666,7 @@ template <class data_T, class nvtx_T, class res_T, class CONFIG_T>
 typename std::enable_if<CONFIG_T::output_collapse == CONFIG_T::collapse_mean>::type
 garnet_stack(data_T const data[CONFIG_T::n_vertices * CONFIG_T::n_in_features], nvtx_T const nvtx[1],
              res_T res[CONFIG_T::n_out_features]) {
-    #pragma HLS DATAFLOW
+    //#pragma HLS DATAFLOW
 
     typedef typename CONFIG_T::template sublayer_t<0> first_layer_t;
     unsigned const ilast = CONFIG_T::n_sublayers - 1;
