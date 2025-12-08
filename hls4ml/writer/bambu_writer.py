@@ -1036,11 +1036,11 @@ class BambuWriter(Writer):
         for h in headers:
             copyfile(srcpath + h, dstpath + h)
 
-        # ap_types
+        # ac_types
         filedir = os.path.dirname(os.path.abspath(__file__))
 
-        srcpath = os.path.join(filedir, '../templates/bambu/ap_types/')
-        dstpath = f'{model.config.get_output_dir()}/firmware/ap_types/'
+        srcpath = os.path.join(filedir, '../templates/bambu/ac_types/')
+        dstpath = f'{model.config.get_output_dir()}/firmware/ac_types/'
 
         if os.path.exists(dstpath):
             rmtree(dstpath)
