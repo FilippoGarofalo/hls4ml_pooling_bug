@@ -5,11 +5,16 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
 #include <vector>
 
 #include "firmware/myproject.h"
 #include "firmware/nnet_utils/nnet_helpers.h"
 
+#ifdef  __BAMBU__
+#include <mdpi/mdpi_user.h>
+#endif
 // hls-fpga-machine-learning insert bram
 
 #define CHECKPOINT 5000
@@ -79,7 +84,7 @@ int main(int argc, char **argv) {
         std::cout << "INFO: Unable to open input/predictions file, using default input." << std::endl;
         const unsigned NUM_TEST_SAMPLES = 5;
         for (unsigned i = 0; i < NUM_TEST_SAMPLES; i++) {
-            // hls-fpga-machine-learning insert zero
+            // hls-fpga-machine-learning insert random
 
             // hls-fpga-machine-learning insert top-level-function
 

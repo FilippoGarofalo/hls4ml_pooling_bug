@@ -2,13 +2,18 @@
 #define NNET_HELPERS_H
 
 #include "hls_stream.h"
+#include "utils/x_hls_utils.h"
 #include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <math.h>
+#include <random>
+#include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
+#include <type_traits>
 #include <vector>
 
 namespace nnet {
@@ -310,6 +315,57 @@ template <class data_T, size_t SIZE> void fill_zero(hls::stream<data_T> &data) {
             data_pack[j] = 0.;
         }
         data.write(data_pack);
+    }
+}
+
+template <class data_T, size_t SIZE> void fill_random(data_T data[SIZE]) {
+    // use fixed seed for reproducibility
+    // std::random_device rd;
+    // std::mt19937 gen(rd());
+    std::mt19937 gen(42);
+    if constexpr (std::is_integral<data_T>::value) {
+        std::uniform_int_distribution<data_T> dis(hls::numeric_limits<data_T>::min(), hls::numeric_limits<data_T>::max());
+        for (size_t i = 0; i < SIZE; i++) {
+            data[i] = dis(gen);
+        }
+    } else {
+        // Generate as float and convert (works for floating-point and fixed-point types)
+        float min_val = static_cast<float>(hls::numeric_limits<data_T>::min());
+        float max_val = static_cast<float>(hls::numeric_limits<data_T>::max());
+        std::uniform_real_distribution<float> dis(min_val, max_val);
+        for (size_t i = 0; i < SIZE; i++) {
+            data[i] = static_cast<data_T>(dis(gen));
+        }
+    }
+}
+
+template <class data_T, size_t SIZE> void fill_random(hls::stream<data_T> &data) {
+    // use fixed seed for reproducibility
+    // std::random_device rd;
+    // std::mt19937 gen(rd());
+    std::mt19937 gen(42);
+    using value_type = typename data_T::value_type;
+    if constexpr (std::is_integral<value_type>::value) {
+        std::uniform_int_distribution<value_type> dis(hls::numeric_limits<value_type>::min(), hls::numeric_limits<value_type>::max());
+        for (int i = 0; i < SIZE / data_T::size; i++) {
+            data_T data_pack;
+            for (int j = 0; j < data_T::size; j++) {
+                data_pack[j] = dis(gen);
+            }
+            data.write(data_pack);
+        }
+    } else {
+        // Generate as float and convert (works for floating-point and fixed-point types)
+        float min_val = static_cast<float>(hls::numeric_limits<value_type>::min());
+        float max_val = static_cast<float>(hls::numeric_limits<value_type>::max());
+        std::uniform_real_distribution<float> dis(min_val, max_val);
+        for (int i = 0; i < SIZE / data_T::size; i++) {
+            data_T data_pack;
+            for (int j = 0; j < data_T::size; j++) {
+                data_pack[j] = static_cast<value_type>(dis(gen));
+            }
+            data.write(data_pack);
+        }
     }
 }
 
