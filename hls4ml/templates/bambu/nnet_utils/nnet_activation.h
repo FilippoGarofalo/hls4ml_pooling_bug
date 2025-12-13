@@ -812,6 +812,7 @@ constexpr inline float elu_fcn_float(float input)
  return exp(input) - 1.; 
 }
 
+#ifdef OLD_ELU
 template <typename CONFIG_T, int N_TABLE> void init_elu_table(typename CONFIG_T::table_t table_out[N_TABLE]) {
     // Default ELU function:
     //   result = alpha * (e^(x) - 1)
@@ -824,10 +825,34 @@ template <typename CONFIG_T, int N_TABLE> void init_elu_table(typename CONFIG_T:
         table_out[ii] = real_val;
     }
 }
+#else
+template <typename CONFIG_T, std::size_t N_TABLE>
+constexpr typename CONFIG_T::table_t compute_elu_fcn_float_index(size_t ii)
+{
+  // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
+  float in_val = -8.0 * ii / float(N_TABLE);
+  // Next, compute lookup table function
+  typename CONFIG_T::table_t real_val = elu_fcn_float(in_val);
+  return real_val;
+}
+
+template <typename CONFIG_T, std::size_t N, std::size_t... I>
+constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_elu_table(std::index_sequence<I...>)
+{
+  return std::array<typename CONFIG_T::table_t, sizeof...(I)>{compute_elu_fcn_float_index<CONFIG_T, N>(I)...};
+}
+
+template <typename CONFIG_T, std::size_t N>
+constexpr static std::array<typename CONFIG_T::table_t, N> init_elu_table()
+{
+  return init_elu_table<CONFIG_T, N>(std::make_index_sequence<N>{});
+}
+#endif
 
 template <class data_T, class param_T, class res_T, typename CONFIG_T>
 void elu(data_T data[CONFIG_T::n_in], const param_T alpha, res_T res[CONFIG_T::n_in]) {
     // Initialize the lookup table
+#ifdef OLD_ELU
 #ifdef __HLS_SYN__
     bool initialized = false;
     typename CONFIG_T::table_t elu_table[CONFIG_T::table_size];
@@ -839,7 +864,9 @@ void elu(data_T data[CONFIG_T::n_in], const param_T alpha, res_T res[CONFIG_T::n
         init_elu_table<CONFIG_T, CONFIG_T::table_size>(elu_table);
         initialized = true;
     }
-
+#else
+    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> elu_table = init_elu_table<CONFIG_T, CONFIG_T::table_size>();
+#endif
     //#pragma HLS PIPELINE
 
     data_T datareg;
@@ -872,6 +899,7 @@ constexpr inline float selu_fcn_float(float input)
  return 1.0507009873554804934193349852946 * (1.6732632423543772848170429916717 * (exp(input) - 1.));
 }
 
+#ifdef OLD_SELU
 template <typename CONFIG_T, int N_TABLE> void init_selu_table(typename CONFIG_T::table_t table_out[N_TABLE]) {
     // Default SELU function:
     //   result = 1.05 * (1.673 * (e^(x) - 1))
@@ -884,9 +912,33 @@ template <typename CONFIG_T, int N_TABLE> void init_selu_table(typename CONFIG_T
         table_out[ii] = real_val;
     }
 }
+#else
+template <typename CONFIG_T, std::size_t N_TABLE>
+constexpr typename CONFIG_T::table_t compute_selu_fcn_float_index(size_t ii)
+{
+  // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
+  float in_val = -8.0 * ii / float(N_TABLE);
+  // Next, compute lookup table function
+  typename CONFIG_T::table_t real_val = selu_fcn_float(in_val);
+  return real_val;
+}
+
+template <typename CONFIG_T, std::size_t N, std::size_t... I>
+constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_selu_table(std::index_sequence<I...>)
+{
+  return std::array<typename CONFIG_T::table_t, sizeof...(I)>{compute_selu_fcn_float_index<CONFIG_T, N>(I)...};
+}
+
+template <typename CONFIG_T, std::size_t N>
+constexpr static std::array<typename CONFIG_T::table_t, N> init_selu_table()
+{
+  return init_selu_table<CONFIG_T, N>(std::make_index_sequence<N>{});
+}
+#endif
 
 template <class data_T, class res_T, typename CONFIG_T> void selu(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
     // Initialize the lookup table
+#ifdef OLD_SELU
 #ifdef __HLS_SYN__
     bool initialized = false;
     typename CONFIG_T::table_t selu_table[CONFIG_T::table_size];
@@ -898,6 +950,9 @@ template <class data_T, class res_T, typename CONFIG_T> void selu(data_T data[CO
         init_selu_table<CONFIG_T, CONFIG_T::table_size>(selu_table);
         initialized = true;
     }
+#else
+    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> selu_table = init_selu_table<CONFIG_T, CONFIG_T::table_size>();
+#endif
 
     //#pragma HLS PIPELINE
 
@@ -1002,3 +1057,4 @@ void ternary_tanh(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
 } // namespace nnet
 
 #endif
+
