@@ -416,7 +416,9 @@ template <class data_T, class res_T, typename CONFIG_T> void softmax(hls::stream
 // *************************************************
 
 template <class data_T, class res_T, typename CONFIG_T> void tanh(hls::stream<data_T> &data, hls::stream<res_T> &res) {
-    // Initialize the lookup table
+    // Initialize the lookup table at compile time
+#ifdef OLD_TANH
+    // Keep old runtime initialization for backwards compatibility
 #ifdef __HLS_SYN__
     bool initialized = false;
     typename CONFIG_T::table_t tanh_table[CONFIG_T::table_size];
@@ -428,6 +430,10 @@ template <class data_T, class res_T, typename CONFIG_T> void tanh(hls::stream<da
         init_tanh_table<CONFIG_T, CONFIG_T::table_size>(tanh_table);
         initialized = true;
     }
+#else
+    // Compile-time initialization
+    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> tanh_table = init_tanh_table<CONFIG_T, CONFIG_T::table_size>();
+#endif
 
 TanHActLoop:
     for (int i = 0; i < CONFIG_T::n_in / res_T::size; i++) {
@@ -453,6 +459,7 @@ TanHActLoop:
         res.write(out_data);
     }
 }
+
 
 // *************************************************
 //       UnaryLUT Activation
