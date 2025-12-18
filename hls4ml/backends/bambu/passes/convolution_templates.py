@@ -479,7 +479,9 @@ class SeparableConv1DConfigTemplate(LayerConfigTemplate):
         params['index'] = str(node.index) + '_pointwise'
         params['weight_t'] = node.get_weights('pointwise').type
         params['min_width'] = params['in_width']
-        params['instructions'] = '0'
+        # explicit constructor for pointwise
+        index_token = params['index']
+        params['instructions'] = f"ap_uint<config{index_token}::filt_width>(0)"
         if node.model.config.get_config_value('IOType') == 'io_parallel':
             namespace = params['namespace']
             params['fill_fn'] = f'{namespace}::fill_buffer_{node.index}_pw'
@@ -622,7 +624,9 @@ class SeparableConv2DConfigTemplate(LayerConfigTemplate):
         params['weight_t'] = node.get_weights('pointwise').type
         params['min_height'] = params['in_height']
         params['min_width'] = params['in_width']
-        params['instructions'] = '0'
+        # explicit constructor for pointwise
+        index_token = params['index']
+        params['instructions'] = f"ap_uint<config{index_token}::filt_height * config{index_token}::filt_width>(0)"
         if node.model.config.get_config_value('IOType') == 'io_parallel':
             namespace = params['namespace']
             params['fill_fn'] = f'{namespace}::fill_buffer_{node.index}_pw'
