@@ -559,6 +559,12 @@ void softmax_multidim(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
 // *************************************************
 //       TanH Activation
 // *************************************************
+
+constexpr inline float tanh_fcn_float(float input)
+{
+    using gcem::tanh;
+    return tanh(input);
+}
 template <typename CONFIG_T, int N_TABLE> void init_tanh_table(typename CONFIG_T::table_t table_out[N_TABLE]) {
     // Implement tanh lookup
     for (int ii = 0; ii < N_TABLE; ii++) {
@@ -566,14 +572,36 @@ template <typename CONFIG_T, int N_TABLE> void init_tanh_table(typename CONFIG_T
         float in_val = 2 * 4.0 * (ii - float(N_TABLE) / 2.0) / float(N_TABLE);
         // Next, compute lookup table function
         typename CONFIG_T::table_t real_val = tanh(in_val);
-        // std::cout << "Tanh:  Lookup table Index: " <<  ii<< " In Value: " << in_val << " Result: " << real_val <<
-        // std::endl;
         table_out[ii] = real_val;
     }
 }
 
+template <typename CONFIG_T, std::size_t N_TABLE>
+constexpr typename CONFIG_T::table_t compute_tanh_fcn_float_index(size_t ii)
+{
+  float in_val = 2 * 4.0 * (ii - float(N_TABLE) / 2.0) / float(N_TABLE);
+  // Compute lookup table function
+  typename CONFIG_T::table_t real_val = tanh_fcn_float(in_val);
+  return real_val;
+}
+
+template <typename CONFIG_T, std::size_t N, std::size_t... I>
+constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_tanh_table(std::index_sequence<I...>)
+{
+  return std::array<typename CONFIG_T::table_t, sizeof...(I)>{compute_tanh_fcn_float_index<CONFIG_T, N>(I)...};
+}
+
+template <typename CONFIG_T, std::size_t N>
+constexpr static std::array<typename CONFIG_T::table_t, N> init_tanh_table()
+{
+  return init_tanh_table<CONFIG_T, N>(std::make_index_sequence<N>{});
+}
+
+
 template <class data_T, class res_T, typename CONFIG_T> void tanh(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
-    // Initialize the lookup table
+    // Initialize the lookup table at compile time
+#ifdef OLD_TANH
+    // Keep old runtime initialization for backwards compatibility
 #ifdef __HLS_SYN__
     bool initialized = false;
     typename CONFIG_T::table_t tanh_table[CONFIG_T::table_size];
@@ -585,17 +613,18 @@ template <class data_T, class res_T, typename CONFIG_T> void tanh(data_T data[CO
         init_tanh_table<CONFIG_T, CONFIG_T::table_size>(tanh_table);
         initialized = true;
     }
+#else
+    // Compile-time initialization
+    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> tanh_table = init_tanh_table<CONFIG_T, CONFIG_T::table_size>();
+#endif
 
-    //#pragma HLS PIPELINE
-
-    // Index into the lookup table based on data
+    
     int data_round;
     int index;
     #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
         data_round = data[ii] * CONFIG_T::table_size / 8;
         index = data_round + 4 * CONFIG_T::table_size / 8;
-        // std::cout << "Input: "  << data[ii] << " Round: " << data_round << " Index: " << index << std::endl;
         if (index < 0)
             index = 0;
         if (index > CONFIG_T::table_size - 1)
