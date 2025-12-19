@@ -57,6 +57,7 @@ PartitionLoop:
             unsigned i_in = i_rf;
             unsigned i_out = 0;
             unsigned i_acc = 0;
+            unsigned i_w = i_rf;
 
         MultLoop:
             #pragma clang loop unroll(full)
