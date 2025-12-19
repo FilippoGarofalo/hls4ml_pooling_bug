@@ -113,7 +113,16 @@ class Conv1DConfigTemplate(LayerConfigTemplate):
                 params['conv_fn'] = 'nnet::Conv1DResource'
 
         params['min_width'] = node.get_attr('min_width', node.get_attr('in_width'))
-        params['instructions'] = node.get_attr('instructions', '0')
+        
+        #explicit constructor
+        instr_raw = node.get_attr('instructions', '0')
+        instr_list = [s.strip() for s in instr_raw.split(',') if s.strip() != '']
+        if len(instr_list) == 1 and instr_list[0] == '0':
+            instr_list = ['0'] * int(params['min_width'])
+        index_token = params['index']
+        params['instructions'] = ','.join(
+            f'ap_uint<config{index_token}::filt_width>({v})' for v in instr_list
+        )
 
         conv_config = self.template.format(**params)
 
@@ -284,6 +293,18 @@ class Conv2DConfigTemplate(LayerConfigTemplate):
         params['min_height'] = node.get_attr('min_height', node.get_attr('in_height'))
         params['min_width'] = node.get_attr('min_width', node.get_attr('in_width'))
         params['instructions'] = node.get_attr('instructions', '0')
+
+        # Build explicit-construction initializer list for 2D pixels
+        instr_raw = node.get_attr('instructions', '0')
+        instr_list = [s.strip() for s in str(instr_raw).split(',') if s.strip() != '']
+        if len(instr_list) == 1 and instr_list[0] == '0':
+            count = int(params['min_height']) * int(params['min_width'])
+            instr_list = ['0'] * count
+        index_token = params['index']
+        params['instructions'] = ','.join(
+            f'ap_uint<config{index_token}::filt_height * config{index_token}::filt_width>({v})'
+            for v in instr_list
+        )
 
         conv_config = self.template.format(**params)
 
@@ -458,7 +479,9 @@ class SeparableConv1DConfigTemplate(LayerConfigTemplate):
         params['index'] = str(node.index) + '_pointwise'
         params['weight_t'] = node.get_weights('pointwise').type
         params['min_width'] = params['in_width']
-        params['instructions'] = '0'
+        # explicit constructor for pointwise
+        index_token = params['index']
+        params['instructions'] = f"ap_uint<config{index_token}::filt_width>(0)"
         if node.model.config.get_config_value('IOType') == 'io_parallel':
             namespace = params['namespace']
             params['fill_fn'] = f'{namespace}::fill_buffer_{node.index}_pw'
@@ -601,7 +624,9 @@ class SeparableConv2DConfigTemplate(LayerConfigTemplate):
         params['weight_t'] = node.get_weights('pointwise').type
         params['min_height'] = params['in_height']
         params['min_width'] = params['in_width']
-        params['instructions'] = '0'
+        # explicit constructor for pointwise
+        index_token = params['index']
+        params['instructions'] = f"ap_uint<config{index_token}::filt_height * config{index_token}::filt_width>(0)"
         if node.model.config.get_config_value('IOType') == 'io_parallel':
             namespace = params['namespace']
             params['fill_fn'] = f'{namespace}::fill_buffer_{node.index}_pw'
