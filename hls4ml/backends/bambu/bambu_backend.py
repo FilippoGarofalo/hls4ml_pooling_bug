@@ -310,7 +310,7 @@ class BambuBackend(FPGABackend):
         run_kwargs=None,
         parse_report=True,
     ):
-        """Run Bambu HLS on given model with default arguments to make HLS4ML compatible.
+        """Run Bambu HLS on given model, adding some default arguments for compatability
 
         Args:
             model (ModelGraph): Model to be built with Bambu.
@@ -335,11 +335,12 @@ class BambuBackend(FPGABackend):
                     args=['--simulate', '--clock-period=5']
                 )
 
-            Capture output for inspection::
+            Capture output for inspection and emit LLVM representation:
 
                 result = model.build(
                     args=['--simulate', '--print-dot'],
-                    capture_output=True
+                    capture_output=True,
+                    debug_IR=True
                 )
                 print(result['stdout'])
         """
@@ -355,7 +356,7 @@ class BambuBackend(FPGABackend):
         REQ_ARGS      = ['-lm', 
                          '-Ifirmware/ac_types',
                         ]
-        DEBUG_IR_ARGS = ['--extra-gcc-options="-emit-llvm -S"', 
+        DEBUG_IR_ARGS = ['--extra-gcc-options=-emit-llvm -S', 
                            '--no-clean'
                         ]
 
