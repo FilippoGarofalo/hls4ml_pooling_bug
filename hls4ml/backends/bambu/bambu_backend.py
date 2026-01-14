@@ -300,28 +300,25 @@ class BambuBackend(FPGABackend):
     def build(
         self,
         model,
-        command=None,
         args=None,
         *,
         capture_output=False,
+        debug_IR=False,
         check=False,
         dry_run=False,
-        cwd=None,
         env=None,
         run_kwargs=None,
         parse_report=True,
     ):
-        """Forward arbitrary commands to the ``bambu`` executable.
+        """Run Bambu HLS on given model, adding some default arguments for compatability
 
         Args:
             model (ModelGraph): Model to be built with Bambu.
-            command (str | Sequence[str] | None): Complete command string or token sequence.
-                When omitted, ``args`` must be provided.
-            args (str | Sequence[str] | None): Arguments appended to ``bambu`` if ``command`` is not given.
+            args (str | Sequence[str] | None): Arguments appended to default Bambu command for this model.
             capture_output (bool): If ``True``, capture ``stdout``/``stderr`` and return them.
+            debug_IR (bool): If ``True``, keep intermediate files produced by Bambu and emit LLVM representation.
             check (bool): If ``True``, raise ``CalledProcessError`` when the command fails.
             dry_run (bool): If ``True``, return the resolved command without executing it.
-            cwd (str | None): Working directory for the command. Defaults to the model output directory.
             env (Mapping[str, str] | None): Environment overrides applied to the subprocess.
             run_kwargs (dict | None): Additional keyword arguments forwarded to ``subprocess.run``.
             parse_report (bool): If ``True``, parse any ``bambu_results_*.xml`` files in the working directory.
@@ -332,45 +329,45 @@ class BambuBackend(FPGABackend):
             the parsed XML contents are returned under the ``report`` key.
 
         Examples:
-            Basic usage with a command string::
+            Basic usage with added args:
 
                 result = model.build(
-                    command='firmware/myproject.cpp --simulate --clock-period=5'
+                    args=['--simulate', '--clock-period=5']
                 )
 
-            Using args parameter (``bambu`` executable is automatically prepended)::
+            Capture output for inspection and emit LLVM representation:
 
                 result = model.build(
-                    args=['firmware/myproject.cpp', '--simulate', '--clock-period=5']
-                )
-
-            Capture output for inspection::
-
-                result = model.build(
-                    args=['firmware/myproject.cpp', '--simulate'],
-                    capture_output=True
+                    args=['--simulate', '--print-dot'],
+                    capture_output=True,
+                    debug_IR=True
                 )
                 print(result['stdout'])
         """
 
-        if run_kwargs is None:
-            run_kwargs = {}
-        if not isinstance(run_kwargs, dict):
-            raise TypeError('run_kwargs must be a mapping')
+        project_name = model.config.get_project_name()
+        project_dir = model.config.get_output_dir()
 
-        if command is not None or args is not None:
-            command_tokens = self._normalize_bambu_command(command, args)
-        else:
-            raise ValueError('No Bambu command specified. Provide "command" or "args".')
+        # Bambu-specific command/flags
+        BASE_COMMAND  = ['bambu', 
+                         os.path.join('firmware', f'{project_name}.cpp'), 
+                         f'--top-fname={project_name}'
+                        ]
+        REQ_ARGS      = ['-lm', 
+                         '-Ifirmware/ac_types',
+                        ]
+        DEBUG_IR_ARGS = ['--extra-gcc-options=-emit-llvm -S', 
+                           '--no-clean'
+                        ]
 
-        target_cwd = cwd or model.config.get_output_dir()
-        if target_cwd is None:
-            target_cwd = os.getcwd()
-        if not os.path.isdir(target_cwd):
-            raise FileNotFoundError(f'Working directory "{target_cwd}" does not exist.')
+        # Build user's custom command with Bambu defaults
+        command_tokens = BASE_COMMAND + REQ_ARGS
 
-        if not dry_run:
-            self._ensure_bambu_available()
+        if args is not None:
+            command_tokens += self._normalize_bambu_command(args)
+
+        if debug_IR:
+            command_tokens += DEBUG_IR_ARGS
 
         command_str = ' '.join(shlex.quote(str(token)) for token in command_tokens)
 
@@ -378,11 +375,14 @@ class BambuBackend(FPGABackend):
             return {
                 'command': command_tokens,
                 'command_str': command_str,
-                'cwd': target_cwd,
+                'cwd': project_dir,
                 'dry_run': True,
-                'report': parse_bambu_report(target_cwd) if parse_report else None,
+                'report': parse_bambu_report(project_dir) if parse_report else None,
             }
+        else:
+            self._ensure_bambu_available()
 
+        # Alter os runtime environment
         run_env = os.environ.copy()
         if env is not None:
             if not hasattr(env, 'items'):
@@ -393,7 +393,11 @@ class BambuBackend(FPGABackend):
                 else:
                     run_env[str(key)] = str(value)
 
-        run_kwargs = dict(run_kwargs)
+        # Add optional runtime keyword arguments to subprocess
+        if run_kwargs is None:
+            run_kwargs = {}
+        if not isinstance(run_kwargs, dict):
+            raise TypeError('run_kwargs must be a mapping')
         if capture_output and any(stream in run_kwargs for stream in ('stdout', 'stderr')):
             raise ValueError('Cannot set stdout/stderr in run_kwargs when capture_output=True.')
         run_kwargs.setdefault('text', True)
@@ -402,18 +406,18 @@ class BambuBackend(FPGABackend):
 
         completed = subprocess.run(
             command_tokens,
-            cwd=target_cwd,
+            cwd=project_dir,
             env=run_env,
             check=check,
             **run_kwargs,
         )
 
-        report_data = parse_bambu_report(target_cwd) if parse_report else None
+        report_data = parse_bambu_report(project_dir) if parse_report else None
 
         result = {
             'command': command_tokens,
             'command_str': command_str,
-            'cwd': target_cwd,
+            'cwd': project_dir,
             'returncode': completed.returncode,
             'report': report_data,
         }
@@ -429,33 +433,16 @@ class BambuBackend(FPGABackend):
             raise EnvironmentError('Bambu HLS installation not found. Make sure "bambu" is on PATH.')
 
     @staticmethod
-    def _normalize_bambu_command(command, args=None):
-        if command is not None and args is not None:
-            raise ValueError('Specify only one of "command" or "args".')
-
-        if command is not None:
-            if isinstance(command, (list, tuple)):
-                tokens = [str(token) for token in command]
-            else:
-                command_str = str(command).strip()
-                if not command_str:
-                    raise ValueError('Command string is empty.')
-                tokens = shlex.split(command_str)
-        elif args is not None:
+    def _normalize_bambu_command(args):
+        if args is not None:
             if isinstance(args, (list, tuple)):
-                tokens = ['bambu'] + [str(token) for token in args]
+                tokens = [str(token) for token in args]
             elif isinstance(args, str):
-                tokens = ['bambu'] + shlex.split(args)
+                tokens = shlex.split(args)
             else:
                 raise TypeError('args must be a string or a sequence of strings.')
         else:
             tokens = []
-
-        if not tokens:
-            raise ValueError('Unable to derive Bambu command.')
-
-        if tokens[0] != 'bambu':
-            tokens.insert(0, 'bambu')
 
         return tokens
 
