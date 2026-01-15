@@ -782,54 +782,96 @@ void softplus(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
     }
 }
 
-// *************************************************
+    // *************************************************
 //       Softsign Activation
 // *************************************************
-constexpr inline float softsign_fcn_float(float input) { return input / (std::abs(input) + 1.); }
-
-template <typename CONFIG_T, int N_TABLE> void init_softsign_table(typename CONFIG_T::table_t table_out[N_TABLE]) {
-    // Default softsign function:
-    //   result = x / (abs(x) + 1)
-    for (int ii = 0; ii < N_TABLE; ii++) {
-        // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
-        float in_val = 2 * 8.0 * (ii - float(N_TABLE) / 2.0) / float(N_TABLE);
-        // Next, compute lookup table function
-        typename CONFIG_T::table_t real_val = softsign_fcn_float(in_val);
-        // std::cout << "Lookup table In Value: " << in_val << " Result: " << real_val << std::endl;
-        table_out[ii] = real_val;
-    }
+constexpr inline float softsign_fcn_float(float input)
+{
+   using gcem::abs;
+   return input / (abs(input) + 1.0f);
 }
+
+
+#ifdef OLD_SOFTSIGN
+
+
+template <typename CONFIG_T, int N_TABLE>
+void init_softsign_table(typename CONFIG_T::table_t table_out[N_TABLE])
+{
+   // Default softsign function:
+   //   result = x / (abs(x) + 1)
+   for (int ii = 0; ii < N_TABLE; ii++) {
+       // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
+       float in_val = 2 * 8.0f * (ii - float(N_TABLE) / 2.0f) / float(N_TABLE);
+       // Next, compute lookup table function
+       typename CONFIG_T::table_t real_val = softsign_fcn_float(in_val);
+       table_out[ii] = real_val;
+   }
+}
+#else
+template <typename CONFIG_T, std::size_t N_TABLE>
+constexpr typename CONFIG_T::table_t compute_softsign_fcn_float_index(std::size_t ii)
+{
+   // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
+   float in_val =
+       2 * 8.0f * (static_cast<float>(ii) - float(N_TABLE) / 2.0f) / float(N_TABLE);
+   // Next, compute lookup table function
+   typename CONFIG_T::table_t real_val = softsign_fcn_float(in_val);
+   return real_val;
+}
+
+
+template <typename CONFIG_T, std::size_t N, std::size_t... I>
+constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)>
+init_softsign_table(std::index_sequence<I...>)
+{
+   return std::array<typename CONFIG_T::table_t, sizeof...(I)>{
+       compute_softsign_fcn_float_index<CONFIG_T, N>(I)...};
+}
+
+
+template <typename CONFIG_T, std::size_t N>
+constexpr static std::array<typename CONFIG_T::table_t, N> init_softsign_table()
+{
+   return init_softsign_table<CONFIG_T, N>(std::make_index_sequence<N>{});
+}
+#endif  // OLD_SOFTSIGN
+
 
 template <class data_T, class res_T, typename CONFIG_T>
 void softsign(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
-    // Initialize the lookup table
-#ifdef __HLS_SYN__
-    bool initialized = false;
-    typename CONFIG_T::table_t softsign_table[CONFIG_T::table_size];
+   // Initialize the lookup table
+#ifdef OLD_SOFTSIGN
+ #ifdef __HLS_SYN__
+   bool initialized = false;
+   typename CONFIG_T::table_t softsign_table[CONFIG_T::table_size];
+ #else
+   static bool initialized = false;
+   static typename CONFIG_T::table_t softsign_table[CONFIG_T::table_size];
+ #endif
+   if (!initialized) {
+       init_softsign_table<CONFIG_T, CONFIG_T::table_size>(softsign_table);
+       initialized = true;
+   }
 #else
-    static bool initialized = false;
-    static typename CONFIG_T::table_t softsign_table[CONFIG_T::table_size];
+   static const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size>
+       softsign_table = init_softsign_table<CONFIG_T, CONFIG_T::table_size>();
 #endif
-    if (!initialized) {
-        init_softsign_table<CONFIG_T, CONFIG_T::table_size>(softsign_table);
-        initialized = true;
-    }
 
-    //#pragma HLS PIPELINE
 
-    // Index into the lookup table based on data
-    int data_round;
-    int index;
-    #pragma clang loop unroll(full)
-    for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
-        data_round = data[ii] * CONFIG_T::table_size / 16;
-        index = data_round + 8 * CONFIG_T::table_size / 16;
-        if (index < 0)
-            index = 0;
-        if (index > CONFIG_T::table_size - 1)
-            index = CONFIG_T::table_size - 1;
-        res[ii] = (res_T)softsign_table[index];
-    }
+   // Index into the lookup table based on data
+   int data_round;
+   int index;
+#pragma clang loop unroll(full)
+   for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
+       data_round = data[ii] * CONFIG_T::table_size / 16;
+       index = data_round + 8 * CONFIG_T::table_size / 16;
+       if (index < 0)
+           index = 0;
+       if (index > CONFIG_T::table_size - 1)
+           index = CONFIG_T::table_size - 1;
+       res[ii] = (res_T)softsign_table[index];
+   }
 }
 
 // *************************************************
