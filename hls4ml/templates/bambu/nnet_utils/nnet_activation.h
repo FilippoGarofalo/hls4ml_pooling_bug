@@ -782,7 +782,7 @@ void softplus(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
     }
 }
 
-    // *************************************************
+// *************************************************
 //       Softsign Activation
 // *************************************************
 constexpr inline float softsign_fcn_float(float input)
