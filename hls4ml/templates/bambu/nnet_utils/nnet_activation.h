@@ -165,13 +165,13 @@ void sigmoid(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
 
 enum class softmax_implementation { latency = 0, legacy = 1, stable = 2, argmax = 3 };
 
-constexpr inline float exp_fcn_float(float input) 
+constexpr inline float exp_fcn_float(float input)
 {
  using gcem::exp;
- return exp(input); 
+ return exp(input);
 }
 
-template <class data_T, unsigned table_size> 
+template <class data_T, unsigned table_size>
 constexpr inline float softmax_real_val_from_idx(unsigned i) {
     // Treat the index as the top N bits
     constexpr int N = ceillog2(table_size); // number of address bits for table
@@ -180,7 +180,7 @@ constexpr inline float softmax_real_val_from_idx(unsigned i) {
     return (float)x;
 }
 
-template <class data_T, unsigned table_size> 
+template <class data_T, unsigned table_size>
 constexpr inline unsigned softmax_idx_from_real_val(data_T x) {
     // Slice the top N bits to get an index into the table
     constexpr int N = ceillog2(table_size); // number of address bits for table
@@ -618,7 +618,7 @@ template <class data_T, class res_T, typename CONFIG_T> void tanh(data_T data[CO
     static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> tanh_table = init_tanh_table<CONFIG_T, CONFIG_T::table_size>();
 #endif
 
-    
+
     int data_round;
     int index;
     #pragma clang loop unroll(full)
@@ -734,7 +734,7 @@ constexpr inline float softplus_fcn_float(float input)
 {
  using gcem::exp;
  using gcem::log;
- return log(exp(input) + 1.); 
+ return log(exp(input) + 1.);
 }
 
 template <typename CONFIG_T, int N_TABLE> void init_softplus_table(typename CONFIG_T::table_t table_out[N_TABLE]) {
@@ -787,16 +787,11 @@ void softplus(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
 // *************************************************
 constexpr inline float softsign_fcn_float(float input)
 {
-   using gcem::abs;
-   return input / (abs(input) + 1.0f);
+ using gcem::abs;
+ return input / (abs(input) + 1.0f);
 }
-
-
 #ifdef OLD_SOFTSIGN
-
-
-template <typename CONFIG_T, int N_TABLE>
-void init_softsign_table(typename CONFIG_T::table_t table_out[N_TABLE])
+template <typename CONFIG_T, int N_TABLE> void init_softsign_table(typename CONFIG_T::table_t table_out[N_TABLE])
 {
    // Default softsign function:
    //   result = x / (abs(x) + 1)
@@ -813,22 +808,17 @@ template <typename CONFIG_T, std::size_t N_TABLE>
 constexpr typename CONFIG_T::table_t compute_softsign_fcn_float_index(std::size_t ii)
 {
    // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
-   float in_val =
-       2 * 8.0f * (static_cast<float>(ii) - float(N_TABLE) / 2.0f) / float(N_TABLE);
+    float in_val = 2 * 8.0f * (static_cast<float>(ii) - float(N_TABLE) / 2.0f) / float(N_TABLE);
    // Next, compute lookup table function
-   typename CONFIG_T::table_t real_val = softsign_fcn_float(in_val);
-   return real_val;
+    typename CONFIG_T::table_t real_val = softsign_fcn_float(in_val);
+    return real_val;
 }
-
 
 template <typename CONFIG_T, std::size_t N, std::size_t... I>
-constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)>
-init_softsign_table(std::index_sequence<I...>)
+constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_softsign_table(std::index_sequence<I...>)
 {
-   return std::array<typename CONFIG_T::table_t, sizeof...(I)>{
-       compute_softsign_fcn_float_index<CONFIG_T, N>(I)...};
+    return std::array<typename CONFIG_T::table_t, sizeof...(I)>{compute_softsign_fcn_float_index<CONFIG_T, N>(I)...};
 }
-
 
 template <typename CONFIG_T, std::size_t N>
 constexpr static std::array<typename CONFIG_T::table_t, N> init_softsign_table()
@@ -836,7 +826,6 @@ constexpr static std::array<typename CONFIG_T::table_t, N> init_softsign_table()
    return init_softsign_table<CONFIG_T, N>(std::make_index_sequence<N>{});
 }
 #endif  // OLD_SOFTSIGN
-
 
 template <class data_T, class res_T, typename CONFIG_T>
 void softsign(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
@@ -858,12 +847,11 @@ void softsign(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
        softsign_table = init_softsign_table<CONFIG_T, CONFIG_T::table_size>();
 #endif
 
-
    // Index into the lookup table based on data
-   int data_round;
-   int index;
-#pragma clang loop unroll(full)
-   for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
+    int data_round;
+    int index;
+    #pragma clang loop unroll(full)
+    for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
        data_round = data[ii] * CONFIG_T::table_size / 16;
        index = data_round + 8 * CONFIG_T::table_size / 16;
        if (index < 0)
@@ -880,7 +868,7 @@ void softsign(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
 constexpr inline float elu_fcn_float(float input)
 {
  using gcem::exp;
- return exp(input) - 1.; 
+ return exp(input) - 1.;
 }
 
 #ifdef OLD_ELU
@@ -1128,4 +1116,3 @@ void ternary_tanh(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
 } // namespace nnet
 
 #endif
-
