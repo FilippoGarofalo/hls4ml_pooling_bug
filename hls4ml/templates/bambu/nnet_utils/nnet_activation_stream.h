@@ -76,8 +76,9 @@ template <class data_T, class res_T, typename CONFIG_T> void sigmoid(hls::stream
         init_sigmoid_table<CONFIG_T, CONFIG_T::table_size>(sigmoid_table);
         initialized = true;
     }
-#else   
-    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> sigmoid_table = init_sigmoid_table<CONFIG_T, CONFIG_T::table_size>();
+#else
+    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> sigmoid_table =
+        init_sigmoid_table<CONFIG_T, CONFIG_T::table_size>();
 #endif
 SigmoidActLoop:
     for (int i = 0; i < CONFIG_T::n_in / res_T::size; i++) {
@@ -125,7 +126,8 @@ void softmax_latency(hls::stream<data_T> &data, hls::stream<res_T> &res) {
         initialized = true;
     }
 #else
-    static constexpr const ::std::array<typename CONFIG_T::exp_table_t, CONFIG_T::exp_table_size> exp_table = init_exp_table<typename data_T::value_type, CONFIG_T, false>();
+    static constexpr const ::std::array<typename CONFIG_T::exp_table_t, CONFIG_T::exp_table_size> exp_table =
+        init_exp_table<typename data_T::value_type, CONFIG_T, false>();
 #endif
 
 #ifdef OLD_INVERT
@@ -143,7 +145,8 @@ void softmax_latency(hls::stream<data_T> &data, hls::stream<res_T> &res) {
         initializedinv = true;
     }
 #else
-    static constexpr const ::std::array<typename CONFIG_T::inv_table_t, CONFIG_T::inv_table_size> invert_table = init_inv_table<typename CONFIG_T::inv_inp_t, CONFIG_T>();
+    static constexpr const ::std::array<typename CONFIG_T::inv_table_t, CONFIG_T::inv_table_size> invert_table =
+        init_inv_table<typename CONFIG_T::inv_inp_t, CONFIG_T>();
 #endif
     constexpr unsigned multiplier_limit = DIV_ROUNDUP(data_T::size, CONFIG_T::reuse_factor);
     constexpr unsigned ii = data_T::size / multiplier_limit;
@@ -190,7 +193,7 @@ template <class data_T, class res_T, typename CONFIG_T>
 void softmax_stable(hls::stream<data_T> &data, hls::stream<res_T> &res) {
     // Initialize the lookup tables
 #ifdef OLD_EXP
-    #ifdef __HLS_SYN__
+#ifdef __HLS_SYN__
     bool initialized = false;
     typename CONFIG_T::exp_table_t exp_table[CONFIG_T::exp_table_size];
 #else
@@ -204,10 +207,11 @@ void softmax_stable(hls::stream<data_T> &data, hls::stream<res_T> &res) {
         initialized = true;
     }
 #else
-    static constexpr const ::std::array<typename CONFIG_T::exp_table_t, CONFIG_T::exp_table_size> exp_table = init_exp_table<typename CONFIG_T::inp_norm_t, CONFIG_T, true>();
+    static constexpr const ::std::array<typename CONFIG_T::exp_table_t, CONFIG_T::exp_table_size> exp_table =
+        init_exp_table<typename CONFIG_T::inp_norm_t, CONFIG_T, true>();
 #endif
 #ifdef OLD_INVERT
-    #ifdef __HLS_SYN__
+#ifdef __HLS_SYN__
     bool initializedinv = false;
     typename CONFIG_T::inv_table_t invert_table[CONFIG_T::inv_table_size];
 #else
@@ -221,7 +225,8 @@ void softmax_stable(hls::stream<data_T> &data, hls::stream<res_T> &res) {
         initializedinv = true;
     }
 #else
-    static constexpr const ::std::array<typename CONFIG_T::inv_table_t, CONFIG_T::inv_table_size> invert_table = init_inv_table<typename CONFIG_T::inv_inp_t, CONFIG_T>();
+    static constexpr const ::std::array<typename CONFIG_T::inv_table_t, CONFIG_T::inv_table_size> invert_table =
+        init_inv_table<typename CONFIG_T::inv_inp_t, CONFIG_T>();
 #endif
 
     constexpr unsigned multiplier_limit = DIV_ROUNDUP(data_T::size, CONFIG_T::reuse_factor);
@@ -432,7 +437,8 @@ template <class data_T, class res_T, typename CONFIG_T> void tanh(hls::stream<da
     }
 #else
     // Compile-time initialization
-    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> tanh_table = init_tanh_table<CONFIG_T, CONFIG_T::table_size>();
+    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> tanh_table =
+        init_tanh_table<CONFIG_T, CONFIG_T::table_size>();
 #endif
 
 TanHActLoop:
@@ -459,7 +465,6 @@ TanHActLoop:
         res.write(out_data);
     }
 }
-
 
 // *************************************************
 //       UnaryLUT Activation
@@ -648,48 +653,48 @@ SoftplusActLoop:
 //       Softsign Activation
 // *************************************************
 
-template <class data_T, class res_T, typename CONFIG_T>
-void softsign(hls::stream<data_T> &data, hls::stream<res_T> &res) {
-   // Initialize the lookup table
+template <class data_T, class res_T, typename CONFIG_T> void softsign(hls::stream<data_T> &data, hls::stream<res_T> &res) {
+    // Initialize the lookup table
 #ifdef OLD_SOFTSIGN
- #ifdef __HLS_SYN__
-   bool initialized = false;
-   typename CONFIG_T::table_t softsign_table[CONFIG_T::table_size];
- #else
-   static bool initialized = false;
-   static typename CONFIG_T::table_t softsign_table[CONFIG_T::table_size];
- #endif
-   if (!initialized) {
-       init_softsign_table<CONFIG_T, CONFIG_T::table_size>(softsign_table);
-       initialized = true;
-   }
+#ifdef __HLS_SYN__
+    bool initialized = false;
+    typename CONFIG_T::table_t softsign_table[CONFIG_T::table_size];
 #else
-   static const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> softsign_table = init_softsign_table<CONFIG_T, CONFIG_T::table_size>();
+    static bool initialized = false;
+    static typename CONFIG_T::table_t softsign_table[CONFIG_T::table_size];
+#endif
+    if (!initialized) {
+        init_softsign_table<CONFIG_T, CONFIG_T::table_size>(softsign_table);
+        initialized = true;
+    }
+#else
+    static const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> softsign_table =
+        init_softsign_table<CONFIG_T, CONFIG_T::table_size>();
 #endif
 SoftsignActLoop:
-   for (int i = 0; i < CONFIG_T::n_in / res_T::size; i++) {
-       //#pragma HLS PIPELINE
+    for (int i = 0; i < CONFIG_T::n_in / res_T::size; i++) {
+        //#pragma HLS PIPELINE
 
-       data_T in_data = data.read();
-       res_T out_data;
-       PRAGMA_DATA_PACK(out_data)
+        data_T in_data = data.read();
+        res_T out_data;
+        PRAGMA_DATA_PACK(out_data)
 
-   SoftsignPackLoop:
-   #pragma clang loop unroll(full)
-       for (int j = 0; j < res_T::size; j++) {
-           //#pragma HLS UNROLL
-           int data_round = in_data[j] * CONFIG_T::table_size / 16;
-           int index      = data_round + 8 * CONFIG_T::table_size / 16;
-           if (index < 0)
-               index = 0;
-           else if (index > CONFIG_T::table_size - 1)
-               index = CONFIG_T::table_size - 1;
-           // funziona sia per C-array che per std::array
-           out_data[j] = softsign_table[index];
-       }
-       
-       res.write(out_data);
-   }
+    SoftsignPackLoop:
+        #pragma clang loop unroll(full)
+        for (int j = 0; j < res_T::size; j++) {
+            //#pragma HLS UNROLL
+            int data_round = in_data[j] * CONFIG_T::table_size / 16;
+            int index = data_round + 8 * CONFIG_T::table_size / 16;
+            if (index < 0)
+                index = 0;
+            else if (index > CONFIG_T::table_size - 1)
+                index = CONFIG_T::table_size - 1;
+            // funziona sia per C-array che per std::array
+            out_data[j] = softsign_table[index];
+        }
+
+        res.write(out_data);
+    }
 }
 
 // *************************************************
@@ -711,7 +716,8 @@ void elu(hls::stream<data_T> &data, param_T alpha, hls::stream<res_T> &res) {
         initialized = true;
     }
 #else
-    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> elu_table = init_elu_table<CONFIG_T, CONFIG_T::table_size>();
+    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> elu_table =
+        init_elu_table<CONFIG_T, CONFIG_T::table_size>();
 #endif
 
 EluActLoop:
@@ -764,7 +770,8 @@ template <class data_T, class res_T, typename CONFIG_T> void selu(hls::stream<da
         initialized = true;
     }
 #else
-    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> selu_table = init_selu_table<CONFIG_T, CONFIG_T::table_size>();
+    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> selu_table =
+        init_selu_table<CONFIG_T, CONFIG_T::table_size>();
 #endif
 
 SeluActLoop:
@@ -882,4 +889,3 @@ PReLUActLoop:
 } // namespace nnet
 
 #endif
-
