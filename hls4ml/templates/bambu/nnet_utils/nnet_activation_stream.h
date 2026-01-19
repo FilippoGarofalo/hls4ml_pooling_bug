@@ -647,12 +647,11 @@ SoftplusActLoop:
 // *************************************************
 //       Softsign Activation
 // *************************************************
+
 template <class data_T, class res_T, typename CONFIG_T>
 void softsign(hls::stream<data_T> &data, hls::stream<res_T> &res) {
    // Initialize the lookup table
 #ifdef OLD_SOFTSIGN
-
-
  #ifdef __HLS_SYN__
    bool initialized = false;
    typename CONFIG_T::table_t softsign_table[CONFIG_T::table_size];
@@ -660,29 +659,20 @@ void softsign(hls::stream<data_T> &data, hls::stream<res_T> &res) {
    static bool initialized = false;
    static typename CONFIG_T::table_t softsign_table[CONFIG_T::table_size];
  #endif
-
-
    if (!initialized) {
        init_softsign_table<CONFIG_T, CONFIG_T::table_size>(softsign_table);
        initialized = true;
    }
-
-
 #else
-   static const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size>
-       softsign_table = init_softsign_table<CONFIG_T, CONFIG_T::table_size>();
+   static const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> softsign_table = init_softsign_table<CONFIG_T, CONFIG_T::table_size>();
 #endif
-
-
 SoftsignActLoop:
    for (int i = 0; i < CONFIG_T::n_in / res_T::size; i++) {
        //#pragma HLS PIPELINE
 
-
        data_T in_data = data.read();
        res_T out_data;
        PRAGMA_DATA_PACK(out_data)
-
 
    SoftsignPackLoop:
    #pragma clang loop unroll(full)
@@ -694,15 +684,13 @@ SoftsignActLoop:
                index = 0;
            else if (index > CONFIG_T::table_size - 1)
                index = CONFIG_T::table_size - 1;
-
-
            // funziona sia per C-array che per std::array
            out_data[j] = softsign_table[index];
        }
+       
        res.write(out_data);
    }
 }
-
 
 // *************************************************
 //       ELU Activation

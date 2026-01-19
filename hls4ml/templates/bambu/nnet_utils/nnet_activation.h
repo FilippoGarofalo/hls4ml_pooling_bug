@@ -2,11 +2,11 @@
 #define NNET_ACTIVATION_H_
 
 #include "ap_fixed.h"
+#include "gcem/include/gcem.hpp"
 #include "nnet_common.h"
 #include <array>
 #include <cmath>
 #include <limits>
-#include "gcem/include/gcem.hpp"
 
 namespace nnet {
 
@@ -82,10 +82,9 @@ template <class data_T, class res_T, typename CONFIG_T> void relu1(data_T data[C
 // *************************************************
 //       Sigmoid Activation
 // *************************************************
-constexpr inline float sigmoid_fcn_float(float input)
-{
- using gcem::exp;
- return 1.0 / (1 + exp(-input));
+constexpr inline float sigmoid_fcn_float(float input) {
+    using gcem::exp;
+    return 1.0 / (1 + exp(-input));
 }
 #ifdef OLD_SIGMOID
 template <typename CONFIG_T, int N_TABLE> void init_sigmoid_table(typename CONFIG_T::table_t table_out[N_TABLE]) {
@@ -102,25 +101,21 @@ template <typename CONFIG_T, int N_TABLE> void init_sigmoid_table(typename CONFI
 }
 #else
 template <typename CONFIG_T, std::size_t N_TABLE>
-constexpr typename CONFIG_T::table_t compute_sigmoid_fcn_float_index(size_t ii)
-{
-  // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
-  float in_val = 2 * 8.0 * (ii - float(N_TABLE) / 2.0) / float(N_TABLE);
-  // Next, compute lookup table function
-  typename CONFIG_T::table_t real_val = sigmoid_fcn_float(in_val);
-  return real_val;
+constexpr typename CONFIG_T::table_t compute_sigmoid_fcn_float_index(size_t ii) {
+    // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
+    float in_val = 2 * 8.0 * (ii - float(N_TABLE) / 2.0) / float(N_TABLE);
+    // Next, compute lookup table function
+    typename CONFIG_T::table_t real_val = sigmoid_fcn_float(in_val);
+    return real_val;
 }
 
 template <typename CONFIG_T, std::size_t N, std::size_t... I>
-constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_sigmoid_table(std::index_sequence<I...>)
-{
-  return std::array<typename CONFIG_T::table_t, sizeof...(I)>{compute_sigmoid_fcn_float_index<CONFIG_T, N>(I)...};
+constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_sigmoid_table(std::index_sequence<I...>) {
+    return std::array<typename CONFIG_T::table_t, sizeof...(I)>{compute_sigmoid_fcn_float_index<CONFIG_T, N>(I)...};
 }
 
-template <typename CONFIG_T, std::size_t N>
-constexpr static std::array<typename CONFIG_T::table_t, N> init_sigmoid_table()
-{
-  return init_sigmoid_table<CONFIG_T, N>(std::make_index_sequence<N>{});
+template <typename CONFIG_T, std::size_t N> constexpr static std::array<typename CONFIG_T::table_t, N> init_sigmoid_table() {
+    return init_sigmoid_table<CONFIG_T, N>(std::make_index_sequence<N>{});
 }
 #endif
 
@@ -140,7 +135,8 @@ void sigmoid(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
         initialized = true;
     }
 #else
-    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> sigmoid_table = init_sigmoid_table<CONFIG_T, CONFIG_T::table_size>();
+    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> sigmoid_table =
+        init_sigmoid_table<CONFIG_T, CONFIG_T::table_size>();
 #endif
     //#pragma HLS PIPELINE
 
@@ -165,14 +161,12 @@ void sigmoid(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
 
 enum class softmax_implementation { latency = 0, legacy = 1, stable = 2, argmax = 3 };
 
-constexpr inline float exp_fcn_float(float input)
-{
- using gcem::exp;
- return exp(input);
+constexpr inline float exp_fcn_float(float input) {
+    using gcem::exp;
+    return exp(input);
 }
 
-template <class data_T, unsigned table_size>
-constexpr inline float softmax_real_val_from_idx(unsigned i) {
+template <class data_T, unsigned table_size> constexpr inline float softmax_real_val_from_idx(unsigned i) {
     // Treat the index as the top N bits
     constexpr int N = ceillog2(table_size); // number of address bits for table
     data_T x(0);
@@ -180,14 +174,12 @@ constexpr inline float softmax_real_val_from_idx(unsigned i) {
     return (float)x;
 }
 
-template <class data_T, unsigned table_size>
-constexpr inline unsigned softmax_idx_from_real_val(data_T x) {
+template <class data_T, unsigned table_size> constexpr inline unsigned softmax_idx_from_real_val(data_T x) {
     // Slice the top N bits to get an index into the table
-    constexpr int N = ceillog2(table_size); // number of address bits for table
-    ap_uint<N> y = x(x.width - 1, x.width - N);              // slice the top N bits of input
+    constexpr int N = ceillog2(table_size);     // number of address bits for table
+    ap_uint<N> y = x(x.width - 1, x.width - N); // slice the top N bits of input
     return (unsigned)y(N - 1, 0);
 }
-
 
 #ifdef OLD_EXP
 template <class data_T, typename CONFIG_T>
@@ -207,28 +199,25 @@ void init_exp_table(typename CONFIG_T::exp_table_t table_out[CONFIG_T::exp_table
 }
 #else
 template <class data_T, typename CONFIG_T, bool negative>
-constexpr typename CONFIG_T::exp_table_t compute_exp_index(size_t i)
-{
-  float x = softmax_real_val_from_idx<data_T, CONFIG_T::exp_table_size>(i) * CONFIG_T::exp_scale;
-  typename CONFIG_T::exp_table_t exp_x = exp_fcn_float(x);
-  if (negative) {
-            // for normalized inputs, we keep the normalization values positive (x_bar = x_max - x)
-            // so we need to negate the input (exp(-x_bar) = exp(x - x_max))
-            x = -x;
-  }
-  return exp_x;
+constexpr typename CONFIG_T::exp_table_t compute_exp_index(size_t i) {
+    float x = softmax_real_val_from_idx<data_T, CONFIG_T::exp_table_size>(i) * CONFIG_T::exp_scale;
+    typename CONFIG_T::exp_table_t exp_x = exp_fcn_float(x);
+    if (negative) {
+        // for normalized inputs, we keep the normalization values positive (x_bar = x_max - x)
+        // so we need to negate the input (exp(-x_bar) = exp(x - x_max))
+        x = -x;
+    }
+    return exp_x;
 }
 
 template <class data_T, bool negative, typename CONFIG_T, std::size_t... I>
-constexpr static std::array<typename CONFIG_T::exp_table_t, sizeof...(I)> init_exp_table(std::index_sequence<I...>)
-{
-  return std::array<typename CONFIG_T::exp_table_t, sizeof...(I)>{compute_exp_index<data_T, CONFIG_T, negative>(I)...};
+constexpr static std::array<typename CONFIG_T::exp_table_t, sizeof...(I)> init_exp_table(std::index_sequence<I...>) {
+    return std::array<typename CONFIG_T::exp_table_t, sizeof...(I)>{compute_exp_index<data_T, CONFIG_T, negative>(I)...};
 }
 
 template <class data_T, typename CONFIG_T, bool negative>
-constexpr static std::array<typename CONFIG_T::exp_table_t, CONFIG_T::exp_table_size> init_exp_table()
-{
-  return init_exp_table<data_T, negative, CONFIG_T>(std::make_index_sequence<CONFIG_T::exp_table_size>{});
+constexpr static std::array<typename CONFIG_T::exp_table_t, CONFIG_T::exp_table_size> init_exp_table() {
+    return init_exp_table<data_T, negative, CONFIG_T>(std::make_index_sequence<CONFIG_T::exp_table_size>{});
 }
 
 #endif
@@ -244,25 +233,21 @@ void init_invert_table(typename CONFIG_T::inv_table_t table_out[CONFIG_T::inv_ta
     }
 }
 #else
-template <class data_T, typename CONFIG_T>
-constexpr typename CONFIG_T::inv_table_t compute_inv_index(size_t i)
-{
-  float x = softmax_real_val_from_idx<data_T, CONFIG_T::inv_table_size>(i);
-  float safe_x = (x == 0.0f) ? std::numeric_limits<float>::min() : x;
-  typename CONFIG_T::inv_table_t inv_x = 1 / safe_x;
-  return inv_x;
+template <class data_T, typename CONFIG_T> constexpr typename CONFIG_T::inv_table_t compute_inv_index(size_t i) {
+    float x = softmax_real_val_from_idx<data_T, CONFIG_T::inv_table_size>(i);
+    float safe_x = (x == 0.0f) ? std::numeric_limits<float>::min() : x;
+    typename CONFIG_T::inv_table_t inv_x = 1 / safe_x;
+    return inv_x;
 }
 
 template <class data_T, typename CONFIG_T, std::size_t... I>
-constexpr static std::array<typename CONFIG_T::inv_table_t, sizeof...(I)> init_inv_table(std::index_sequence<I...>)
-{
-  return std::array<typename CONFIG_T::inv_table_t, sizeof...(I)>{compute_inv_index<data_T, CONFIG_T>(I)...};
+constexpr static std::array<typename CONFIG_T::inv_table_t, sizeof...(I)> init_inv_table(std::index_sequence<I...>) {
+    return std::array<typename CONFIG_T::inv_table_t, sizeof...(I)>{compute_inv_index<data_T, CONFIG_T>(I)...};
 }
 
 template <class data_T, typename CONFIG_T>
-constexpr static std::array<typename CONFIG_T::inv_table_t, CONFIG_T::inv_table_size> init_inv_table()
-{
-  return init_inv_table<data_T, CONFIG_T>(std::make_index_sequence<CONFIG_T::inv_table_size>{});
+constexpr static std::array<typename CONFIG_T::inv_table_t, CONFIG_T::inv_table_size> init_inv_table() {
+    return init_inv_table<data_T, CONFIG_T>(std::make_index_sequence<CONFIG_T::inv_table_size>{});
 }
 
 #endif
@@ -286,7 +271,8 @@ void softmax_latency(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice
         initialized = true;
     }
 #else
-    static constexpr const ::std::array<typename CONFIG_T::exp_table_t, CONFIG_T::table_size> exp_table = init_exp_table<data_T, CONFIG_T, false>();
+    static constexpr const ::std::array<typename CONFIG_T::exp_table_t, CONFIG_T::table_size> exp_table =
+        init_exp_table<data_T, CONFIG_T, false>();
 #endif
 #ifdef OLD_INVERT
 #ifdef __HLS_SYN__
@@ -303,7 +289,8 @@ void softmax_latency(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice
         initializedinv = true;
     }
 #else
-    static constexpr const ::std::array<typename CONFIG_T::inv_table_t, CONFIG_T::inv_table_size> invert_table = init_inv_table<typename CONFIG_T::inv_table_t, CONFIG_T>();
+    static constexpr const ::std::array<typename CONFIG_T::inv_table_t, CONFIG_T::inv_table_size> invert_table =
+        init_inv_table<typename CONFIG_T::inv_table_t, CONFIG_T>();
 #endif
     // Calculate all the e^x's
     typename CONFIG_T::accum_t exp_res[CONFIG_T::n_slice];
@@ -347,7 +334,8 @@ void softmax_stable(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice]
         initialized = true;
     }
 #else
-    static constexpr const ::std::array<typename CONFIG_T::exp_table_t, CONFIG_T::exp_table_size> exp_table = init_exp_table<typename CONFIG_T::inp_norm_t, CONFIG_T, true>();
+    static constexpr const ::std::array<typename CONFIG_T::exp_table_t, CONFIG_T::exp_table_size> exp_table =
+        init_exp_table<typename CONFIG_T::inp_norm_t, CONFIG_T, true>();
 #endif
 #ifdef OLD_INVERT
 #ifdef __HLS_SYN__
@@ -364,7 +352,8 @@ void softmax_stable(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice]
         initializedinv = true;
     }
 #else
-    static constexpr const ::std::array<typename CONFIG_T::inv_table_t, CONFIG_T::inv_table_size> invert_table = init_inv_table<typename CONFIG_T::inv_inp_t, CONFIG_T>();
+    static constexpr const ::std::array<typename CONFIG_T::inv_table_t, CONFIG_T::inv_table_size> invert_table =
+        init_inv_table<typename CONFIG_T::inv_inp_t, CONFIG_T>();
 #endif
 
     // Find the max and compute all delta(x_i, x_max)
@@ -560,8 +549,7 @@ void softmax_multidim(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
 //       TanH Activation
 // *************************************************
 
-constexpr inline float tanh_fcn_float(float input)
-{
+constexpr inline float tanh_fcn_float(float input) {
     using gcem::tanh;
     return tanh(input);
 }
@@ -577,26 +565,21 @@ template <typename CONFIG_T, int N_TABLE> void init_tanh_table(typename CONFIG_T
 }
 
 template <typename CONFIG_T, std::size_t N_TABLE>
-constexpr typename CONFIG_T::table_t compute_tanh_fcn_float_index(size_t ii)
-{
-  float in_val = 2 * 4.0 * (ii - float(N_TABLE) / 2.0) / float(N_TABLE);
-  // Compute lookup table function
-  typename CONFIG_T::table_t real_val = tanh_fcn_float(in_val);
-  return real_val;
+constexpr typename CONFIG_T::table_t compute_tanh_fcn_float_index(size_t ii) {
+    float in_val = 2 * 4.0 * (ii - float(N_TABLE) / 2.0) / float(N_TABLE);
+    // Compute lookup table function
+    typename CONFIG_T::table_t real_val = tanh_fcn_float(in_val);
+    return real_val;
 }
 
 template <typename CONFIG_T, std::size_t N, std::size_t... I>
-constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_tanh_table(std::index_sequence<I...>)
-{
-  return std::array<typename CONFIG_T::table_t, sizeof...(I)>{compute_tanh_fcn_float_index<CONFIG_T, N>(I)...};
+constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_tanh_table(std::index_sequence<I...>) {
+    return std::array<typename CONFIG_T::table_t, sizeof...(I)>{compute_tanh_fcn_float_index<CONFIG_T, N>(I)...};
 }
 
-template <typename CONFIG_T, std::size_t N>
-constexpr static std::array<typename CONFIG_T::table_t, N> init_tanh_table()
-{
-  return init_tanh_table<CONFIG_T, N>(std::make_index_sequence<N>{});
+template <typename CONFIG_T, std::size_t N> constexpr static std::array<typename CONFIG_T::table_t, N> init_tanh_table() {
+    return init_tanh_table<CONFIG_T, N>(std::make_index_sequence<N>{});
 }
-
 
 template <class data_T, class res_T, typename CONFIG_T> void tanh(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
     // Initialize the lookup table at compile time
@@ -615,9 +598,9 @@ template <class data_T, class res_T, typename CONFIG_T> void tanh(data_T data[CO
     }
 #else
     // Compile-time initialization
-    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> tanh_table = init_tanh_table<CONFIG_T, CONFIG_T::table_size>();
+    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> tanh_table =
+        init_tanh_table<CONFIG_T, CONFIG_T::table_size>();
 #endif
-
 
     int data_round;
     int index;
@@ -730,11 +713,10 @@ void thresholded_relu(data_T data[CONFIG_T::n_in], param_T theta, res_T res[CONF
 // *************************************************
 //       Softplus Activation
 // *************************************************
-constexpr inline float softplus_fcn_float(float input)
-{
- using gcem::exp;
- using gcem::log;
- return log(exp(input) + 1.);
+constexpr inline float softplus_fcn_float(float input) {
+    using gcem::exp;
+    using gcem::log;
+    return log(exp(input) + 1.);
 }
 
 template <typename CONFIG_T, int N_TABLE> void init_softplus_table(typename CONFIG_T::table_t table_out[N_TABLE]) {
@@ -785,90 +767,84 @@ void softplus(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
 // *************************************************
 //       Softsign Activation
 // *************************************************
-constexpr inline float softsign_fcn_float(float input)
-{
- using gcem::abs;
- return input / (abs(input) + 1.0f);
+constexpr inline float softsign_fcn_float(float input) {
+    using gcem::abs;
+    return input / (abs(input) + 1.0f);
 }
 #ifdef OLD_SOFTSIGN
-template <typename CONFIG_T, int N_TABLE> void init_softsign_table(typename CONFIG_T::table_t table_out[N_TABLE])
-{
-   // Default softsign function:
-   //   result = x / (abs(x) + 1)
-   for (int ii = 0; ii < N_TABLE; ii++) {
-       // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
-       float in_val = 2 * 8.0f * (ii - float(N_TABLE) / 2.0f) / float(N_TABLE);
-       // Next, compute lookup table function
-       typename CONFIG_T::table_t real_val = softsign_fcn_float(in_val);
-       table_out[ii] = real_val;
-   }
+template <typename CONFIG_T, int N_TABLE> void init_softsign_table(typename CONFIG_T::table_t table_out[N_TABLE]) {
+    // Default softsign function:
+    //   result = x / (abs(x) + 1)
+    for (int ii = 0; ii < N_TABLE; ii++) {
+        // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
+        float in_val = 2 * 8.0f * (ii - float(N_TABLE) / 2.0f) / float(N_TABLE);
+        // Next, compute lookup table function
+        typename CONFIG_T::table_t real_val = softsign_fcn_float(in_val);
+        table_out[ii] = real_val;
+    }
 }
 #else
 template <typename CONFIG_T, std::size_t N_TABLE>
-constexpr typename CONFIG_T::table_t compute_softsign_fcn_float_index(std::size_t ii)
-{
-   // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
+constexpr typename CONFIG_T::table_t compute_softsign_fcn_float_index(std::size_t ii) {
+    // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
     float in_val = 2 * 8.0f * (static_cast<float>(ii) - float(N_TABLE) / 2.0f) / float(N_TABLE);
-   // Next, compute lookup table function
+    // Next, compute lookup table function
     typename CONFIG_T::table_t real_val = softsign_fcn_float(in_val);
     return real_val;
 }
 
 template <typename CONFIG_T, std::size_t N, std::size_t... I>
-constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_softsign_table(std::index_sequence<I...>)
-{
+constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_softsign_table(std::index_sequence<I...>) {
     return std::array<typename CONFIG_T::table_t, sizeof...(I)>{compute_softsign_fcn_float_index<CONFIG_T, N>(I)...};
 }
 
 template <typename CONFIG_T, std::size_t N>
-constexpr static std::array<typename CONFIG_T::table_t, N> init_softsign_table()
-{
-   return init_softsign_table<CONFIG_T, N>(std::make_index_sequence<N>{});
+constexpr static std::array<typename CONFIG_T::table_t, N> init_softsign_table() {
+    return init_softsign_table<CONFIG_T, N>(std::make_index_sequence<N>{});
 }
-#endif  // OLD_SOFTSIGN
+#endif // OLD_SOFTSIGN
 
 template <class data_T, class res_T, typename CONFIG_T>
 void softsign(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
-   // Initialize the lookup table
+    // Initialize the lookup table
 #ifdef OLD_SOFTSIGN
- #ifdef __HLS_SYN__
-   bool initialized = false;
-   typename CONFIG_T::table_t softsign_table[CONFIG_T::table_size];
- #else
-   static bool initialized = false;
-   static typename CONFIG_T::table_t softsign_table[CONFIG_T::table_size];
- #endif
-   if (!initialized) {
-       init_softsign_table<CONFIG_T, CONFIG_T::table_size>(softsign_table);
-       initialized = true;
-   }
+#ifdef __HLS_SYN__
+    bool initialized = false;
+    typename CONFIG_T::table_t softsign_table[CONFIG_T::table_size];
 #else
-   static const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size>
-       softsign_table = init_softsign_table<CONFIG_T, CONFIG_T::table_size>();
+    static bool initialized = false;
+    static typename CONFIG_T::table_t softsign_table[CONFIG_T::table_size];
+#endif
+    if (!initialized) {
+        init_softsign_table<CONFIG_T, CONFIG_T::table_size>(softsign_table);
+        initialized = true;
+    }
+#else
+    static const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> softsign_table =
+        init_softsign_table<CONFIG_T, CONFIG_T::table_size>();
 #endif
 
-   // Index into the lookup table based on data
+    // Index into the lookup table based on data
     int data_round;
     int index;
     #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
-       data_round = data[ii] * CONFIG_T::table_size / 16;
-       index = data_round + 8 * CONFIG_T::table_size / 16;
-       if (index < 0)
-           index = 0;
-       if (index > CONFIG_T::table_size - 1)
-           index = CONFIG_T::table_size - 1;
-       res[ii] = (res_T)softsign_table[index];
-   }
+        data_round = data[ii] * CONFIG_T::table_size / 16;
+        index = data_round + 8 * CONFIG_T::table_size / 16;
+        if (index < 0)
+            index = 0;
+        if (index > CONFIG_T::table_size - 1)
+            index = CONFIG_T::table_size - 1;
+        res[ii] = (res_T)softsign_table[index];
+    }
 }
 
 // *************************************************
 //       ELU Activation
 // *************************************************
-constexpr inline float elu_fcn_float(float input)
-{
- using gcem::exp;
- return exp(input) - 1.;
+constexpr inline float elu_fcn_float(float input) {
+    using gcem::exp;
+    return exp(input) - 1.;
 }
 
 #ifdef OLD_ELU
@@ -886,25 +862,21 @@ template <typename CONFIG_T, int N_TABLE> void init_elu_table(typename CONFIG_T:
 }
 #else
 template <typename CONFIG_T, std::size_t N_TABLE>
-constexpr typename CONFIG_T::table_t compute_elu_fcn_float_index(size_t ii)
-{
-  // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
-  float in_val = -8.0 * ii / float(N_TABLE);
-  // Next, compute lookup table function
-  typename CONFIG_T::table_t real_val = elu_fcn_float(in_val);
-  return real_val;
+constexpr typename CONFIG_T::table_t compute_elu_fcn_float_index(size_t ii) {
+    // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
+    float in_val = -8.0 * ii / float(N_TABLE);
+    // Next, compute lookup table function
+    typename CONFIG_T::table_t real_val = elu_fcn_float(in_val);
+    return real_val;
 }
 
 template <typename CONFIG_T, std::size_t N, std::size_t... I>
-constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_elu_table(std::index_sequence<I...>)
-{
-  return std::array<typename CONFIG_T::table_t, sizeof...(I)>{compute_elu_fcn_float_index<CONFIG_T, N>(I)...};
+constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_elu_table(std::index_sequence<I...>) {
+    return std::array<typename CONFIG_T::table_t, sizeof...(I)>{compute_elu_fcn_float_index<CONFIG_T, N>(I)...};
 }
 
-template <typename CONFIG_T, std::size_t N>
-constexpr static std::array<typename CONFIG_T::table_t, N> init_elu_table()
-{
-  return init_elu_table<CONFIG_T, N>(std::make_index_sequence<N>{});
+template <typename CONFIG_T, std::size_t N> constexpr static std::array<typename CONFIG_T::table_t, N> init_elu_table() {
+    return init_elu_table<CONFIG_T, N>(std::make_index_sequence<N>{});
 }
 #endif
 
@@ -924,7 +896,8 @@ void elu(data_T data[CONFIG_T::n_in], const param_T alpha, res_T res[CONFIG_T::n
         initialized = true;
     }
 #else
-    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> elu_table = init_elu_table<CONFIG_T, CONFIG_T::table_size>();
+    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> elu_table =
+        init_elu_table<CONFIG_T, CONFIG_T::table_size>();
 #endif
     //#pragma HLS PIPELINE
 
@@ -952,10 +925,9 @@ template <class data_T, class res_T, typename CONFIG_T> void elu(data_T data[CON
 // *************************************************
 //       SELU Activation
 // *************************************************
-constexpr inline float selu_fcn_float(float input)
-{
- using gcem::exp;
- return 1.0507009873554804934193349852946 * (1.6732632423543772848170429916717 * (exp(input) - 1.));
+constexpr inline float selu_fcn_float(float input) {
+    using gcem::exp;
+    return 1.0507009873554804934193349852946 * (1.6732632423543772848170429916717 * (exp(input) - 1.));
 }
 
 #ifdef OLD_SELU
@@ -973,25 +945,21 @@ template <typename CONFIG_T, int N_TABLE> void init_selu_table(typename CONFIG_T
 }
 #else
 template <typename CONFIG_T, std::size_t N_TABLE>
-constexpr typename CONFIG_T::table_t compute_selu_fcn_float_index(size_t ii)
-{
-  // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
-  float in_val = -8.0 * ii / float(N_TABLE);
-  // Next, compute lookup table function
-  typename CONFIG_T::table_t real_val = selu_fcn_float(in_val);
-  return real_val;
+constexpr typename CONFIG_T::table_t compute_selu_fcn_float_index(size_t ii) {
+    // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
+    float in_val = -8.0 * ii / float(N_TABLE);
+    // Next, compute lookup table function
+    typename CONFIG_T::table_t real_val = selu_fcn_float(in_val);
+    return real_val;
 }
 
 template <typename CONFIG_T, std::size_t N, std::size_t... I>
-constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_selu_table(std::index_sequence<I...>)
-{
-  return std::array<typename CONFIG_T::table_t, sizeof...(I)>{compute_selu_fcn_float_index<CONFIG_T, N>(I)...};
+constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_selu_table(std::index_sequence<I...>) {
+    return std::array<typename CONFIG_T::table_t, sizeof...(I)>{compute_selu_fcn_float_index<CONFIG_T, N>(I)...};
 }
 
-template <typename CONFIG_T, std::size_t N>
-constexpr static std::array<typename CONFIG_T::table_t, N> init_selu_table()
-{
-  return init_selu_table<CONFIG_T, N>(std::make_index_sequence<N>{});
+template <typename CONFIG_T, std::size_t N> constexpr static std::array<typename CONFIG_T::table_t, N> init_selu_table() {
+    return init_selu_table<CONFIG_T, N>(std::make_index_sequence<N>{});
 }
 #endif
 
@@ -1010,7 +978,8 @@ template <class data_T, class res_T, typename CONFIG_T> void selu(data_T data[CO
         initialized = true;
     }
 #else
-    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> selu_table = init_selu_table<CONFIG_T, CONFIG_T::table_size>();
+    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> selu_table =
+        init_selu_table<CONFIG_T, CONFIG_T::table_size>();
 #endif
 
     //#pragma HLS PIPELINE
