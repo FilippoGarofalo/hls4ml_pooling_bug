@@ -8,7 +8,7 @@ CFLAGS="-O3 -fPIC"
 if echo "" | ${CC} -Werror -fsyntax-only -std=c++23 -xc++ - -o /dev/null &> /dev/null; then
   CFLAGS+=" -std=c++23"
 else
-  CFLAGS+=" -std=c++11"
+  CFLAGS+=" -std=c++14"
 fi
 
 # Include -fno-gnu-unique if it is there
