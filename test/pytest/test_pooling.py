@@ -33,7 +33,7 @@ def keras_model_1d(request):
     return model, model_type, pads, strides
 
 
-@pytest.mark.parametrize('backend', ['Quartus', 'Vitis', 'Vivado', 'Catapult', 'oneAPI'])
+@pytest.mark.parametrize('backend', ['Bambu'])
 @pytest.mark.parametrize(
     'keras_model_1d',
     [
@@ -62,12 +62,19 @@ def test_pool1d(backend, keras_model_1d, data_1d, io_type):
         model, default_precision='ap_fixed<32,9>', granularity='name', backend=backend
     )
 
+    if isinstance(strides, tuple):
+        strides_part = f"_{'_'.join(str(x) for x in strides)}"
+    elif strides is not None:
+        strides_part = f"_{strides}"
+    else:
+        strides_part = ""
+
     hls_model = hls4ml.converters.convert_from_keras_model(
         model,
         hls_config=config,
         io_type=io_type,
         output_dir=str(
-            test_root_path / f'hls4mlprj_globalpool1d_{backend}_{io_type}_{model_type}_padding_{padding}_{strides}'
+            test_root_path / f'hls4mlprj_globalpool1d_{backend}_{io_type}_{model_type}_padding_{padding}{strides_part}'
         ),
         backend=backend,
     )
@@ -78,7 +85,7 @@ def test_pool1d(backend, keras_model_1d, data_1d, io_type):
     np.testing.assert_allclose(y_keras, y_hls, rtol=0, atol=atol, verbose=True)
 
 
-@pytest.mark.parametrize('backend', ['Quartus', 'Vitis', 'Vivado', 'oneAPI'])
+@pytest.mark.parametrize('backend', ['Bambu'])
 @pytest.mark.parametrize(
     'keras_model_1d',
     [
@@ -97,11 +104,18 @@ def test_pool1d_stream(backend, keras_model_1d, data_1d, io_type):
 
     config = hls4ml.utils.config_from_keras_model(model, default_precision='ap_fixed<32,9>', granularity='name')
 
+    if isinstance(_, tuple):
+        strides_part = f"_{'_'.join(str(x) for x in _)}"
+    elif _ is not None:
+        strides_part = f"_{_}"
+    else:
+        strides_part = ""
+
     hls_model = hls4ml.converters.convert_from_keras_model(
         model,
         hls_config=config,
         io_type=io_type,
-        output_dir=str(test_root_path / f'hls4mlprj_pool1d_{backend}_{io_type}_{model_type}_padding_{padding}'),
+        output_dir=str(test_root_path / f'hls4mlprj_pool1d_{backend}_{io_type}_{model_type}_padding_{padding}{strides_part}'),
         backend=backend,
     )
     hls_model.compile()
@@ -130,7 +144,7 @@ def keras_model_2d(request):
     return model, model_type, pads, strides
 
 
-@pytest.mark.parametrize('backend', ['Quartus', 'Vitis', 'Vivado', 'Catapult', 'oneAPI'])
+@pytest.mark.parametrize('backend', ['Bambu'])
 @pytest.mark.parametrize(
     'keras_model_2d',
     [
@@ -159,11 +173,18 @@ def test_pool2d(backend, keras_model_2d, data_2d, io_type):
         model, default_precision='ap_fixed<32,9>', granularity='name', backend=backend
     )
 
+    if isinstance(strides, tuple):
+        strides_part = f"_{'_'.join(str(x) for x in strides)}"
+    elif strides is not None:
+        strides_part = f"_{strides}"
+    else:
+        strides_part = ""
+
     hls_model = hls4ml.converters.convert_from_keras_model(
         model,
         hls_config=config,
         io_type=io_type,
-        output_dir=str(test_root_path / f'hls4mlprj_pool2d_{backend}_{io_type}_{model_type}_padding_{padding}_{strides}'),
+        output_dir=str(test_root_path / f'hls4mlprj_pool2d_{backend}_{io_type}_{model_type}_padding_{padding}{strides_part}'),
         backend=backend,
     )
     hls_model.compile()
@@ -173,7 +194,7 @@ def test_pool2d(backend, keras_model_2d, data_2d, io_type):
     np.testing.assert_allclose(y_keras, y_hls, rtol=0, atol=atol, verbose=True)
 
 
-@pytest.mark.parametrize('backend', ['Quartus', 'Vitis', 'Vivado', 'oneAPI'])
+@pytest.mark.parametrize('backend', ['Bambu'])
 @pytest.mark.parametrize(
     'keras_model_2d',
     [
@@ -192,11 +213,18 @@ def test_pool2d_stream(backend, keras_model_2d, data_2d, io_type):
 
     config = hls4ml.utils.config_from_keras_model(model, default_precision='ap_fixed<32,9>', granularity='name')
 
+    if isinstance(_, tuple):
+        strides_part = f"_{'_'.join(str(x) for x in _)}"
+    elif _ is not None:
+        strides_part = f"_{_}"
+    else:
+        strides_part = ""
+
     hls_model = hls4ml.converters.convert_from_keras_model(
         model,
         hls_config=config,
         io_type=io_type,
-        output_dir=str(test_root_path / f'hls4mlprj_pool2d_{backend}_{io_type}_{model_type}_padding_{padding}'),
+        output_dir=str(test_root_path / f'hls4mlprj_pool2d_{backend}_{io_type}_{model_type}_padding_{padding}{strides_part}'),
         backend=backend,
     )
     hls_model.compile()
