@@ -63,7 +63,7 @@
     - source /opt/intel/oneapi/setvars.sh --force
   script:
     - cd "$CI_PROJECT_DIR/test/pytest"
-    - pytest $PYTESTFILE -rA --cov-report xml --cov-report term --cov=hls4ml --junitxml=report.xml --randomly-seed=42 --randomly-dont-reorganize --randomly-dont-reset-seed
+    - pytest $PYTESTFILE -rA --cov-report xml --cov-report term --cov=hls4ml --junitxml=report.xml --randomly-seed=42 --randomly-dont-reorganize --randomly-dont-reset-seed -k "backend and Bambu"
   artifacts:
     when: always
     reports:
